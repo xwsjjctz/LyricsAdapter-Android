@@ -1,0 +1,1038 @@
+{
+ "durationSeconds": 84.855,
+ "plainText": "夜色慢慢落在窗台上\n街灯把影子拉得很长\nEvery little light keeps on shining\n我数着雨滴落下的声响\n风吹过空荡荡的走廊\nHold the moment while it is glowing\n旧唱片还在转个不停\n你说过的话还很清晰\nWe were dancing in the quiet rain\n把心事折成纸飞机\n飞过那片安静的海\nEvery echo calls your name again\n时间像潮水退去又回来\n留下贝壳和一点点期待\nTurn the radio up and sing along\n天亮以前别说再见\n让我们再多走一段\nAll the stars are falling into place\n夜色慢慢落在窗台上\n街灯把影子拉得很长\nEvery little light keeps on shining\n我会记得这一刻的光",
+ "syncedLyrics": [
+  {
+   "time": 1.5,
+   "text": "夜色慢慢落在窗台上",
+   "words": [
+    {
+     "time": 1.5,
+     "duration": 0.34,
+     "text": "夜"
+    },
+    {
+     "time": 1.84,
+     "duration": 0.42,
+     "text": "色"
+    },
+    {
+     "time": 2.26,
+     "duration": 0.26,
+     "text": "慢"
+    },
+    {
+     "time": 2.52,
+     "duration": 0.26,
+     "text": "慢"
+    },
+    {
+     "time": 2.78,
+     "duration": 0.38,
+     "text": "落"
+    },
+    {
+     "time": 3.16,
+     "duration": 0.34,
+     "text": "在"
+    },
+    {
+     "time": 3.5,
+     "duration": 0.38,
+     "text": "窗"
+    },
+    {
+     "time": 3.88,
+     "duration": 0.38,
+     "text": "台"
+    },
+    {
+     "time": 4.26,
+     "duration": 0.38,
+     "text": "上"
+    }
+   ]
+  },
+  {
+   "time": 5.54,
+   "text": "街灯把影子拉得很长",
+   "words": [
+    {
+     "time": 5.54,
+     "duration": 0.38,
+     "text": "街"
+    },
+    {
+     "time": 5.92,
+     "duration": 0.38,
+     "text": "灯"
+    },
+    {
+     "time": 6.3,
+     "duration": 0.3,
+     "text": "把"
+    },
+    {
+     "time": 6.6,
+     "duration": 0.38,
+     "text": "影"
+    },
+    {
+     "time": 6.98,
+     "duration": 0.3,
+     "text": "子"
+    },
+    {
+     "time": 7.28,
+     "duration": 0.42,
+     "text": "拉"
+    },
+    {
+     "time": 7.7,
+     "duration": 0.3,
+     "text": "得"
+    },
+    {
+     "time": 8,
+     "duration": 0.3,
+     "text": "很"
+    },
+    {
+     "time": 8.3,
+     "duration": 0.3,
+     "text": "长"
+    }
+   ]
+  },
+  {
+   "time": 9.5,
+   "text": "Every little light keeps on shining",
+   "words": [
+    {
+     "time": 9.5,
+     "duration": 0.425,
+     "text": "Every "
+    },
+    {
+     "time": 9.925,
+     "duration": 0.47,
+     "text": "little "
+    },
+    {
+     "time": 10.395,
+     "duration": 0.425,
+     "text": "light "
+    },
+    {
+     "time": 10.82,
+     "duration": 0.425,
+     "text": "keeps "
+    },
+    {
+     "time": 11.245,
+     "duration": 0.29,
+     "text": "on "
+    },
+    {
+     "time": 11.535,
+     "duration": 0.515,
+     "text": "shining"
+    }
+   ]
+  },
+  {
+   "time": 12.95,
+   "text": "我数着雨滴落下的声响",
+   "words": [
+    {
+     "time": 12.95,
+     "duration": 0.26,
+     "text": "我"
+    },
+    {
+     "time": 13.21,
+     "duration": 0.38,
+     "text": "数"
+    },
+    {
+     "time": 13.59,
+     "duration": 0.38,
+     "text": "着"
+    },
+    {
+     "time": 13.97,
+     "duration": 0.34,
+     "text": "雨"
+    },
+    {
+     "time": 14.31,
+     "duration": 0.42,
+     "text": "滴"
+    },
+    {
+     "time": 14.73,
+     "duration": 0.38,
+     "text": "落"
+    },
+    {
+     "time": 15.11,
+     "duration": 0.42,
+     "text": "下"
+    },
+    {
+     "time": 15.53,
+     "duration": 0.26,
+     "text": "的"
+    },
+    {
+     "time": 15.79,
+     "duration": 0.38,
+     "text": "声"
+    },
+    {
+     "time": 16.17,
+     "duration": 0.42,
+     "text": "响"
+    }
+   ]
+  },
+  {
+   "time": 17.49,
+   "text": "风吹过空荡荡的走廊",
+   "words": [
+    {
+     "time": 17.49,
+     "duration": 0.38,
+     "text": "风"
+    },
+    {
+     "time": 17.87,
+     "duration": 0.3,
+     "text": "吹"
+    },
+    {
+     "time": 18.17,
+     "duration": 0.34,
+     "text": "过"
+    },
+    {
+     "time": 18.51,
+     "duration": 0.42,
+     "text": "空"
+    },
+    {
+     "time": 18.93,
+     "duration": 0.38,
+     "text": "荡"
+    },
+    {
+     "time": 19.31,
+     "duration": 0.38,
+     "text": "荡"
+    },
+    {
+     "time": 19.69,
+     "duration": 0.26,
+     "text": "的"
+    },
+    {
+     "time": 19.95,
+     "duration": 0.38,
+     "text": "走"
+    },
+    {
+     "time": 20.33,
+     "duration": 0.3,
+     "text": "廊"
+    }
+   ]
+  },
+  {
+   "time": 21.53,
+   "text": "Hold the moment while it is glowing",
+   "words": [
+    {
+     "time": 21.53,
+     "duration": 0.38,
+     "text": "Hold "
+    },
+    {
+     "time": 21.91,
+     "duration": 0.335,
+     "text": "the "
+    },
+    {
+     "time": 22.245,
+     "duration": 0.47,
+     "text": "moment "
+    },
+    {
+     "time": 22.715,
+     "duration": 0.425,
+     "text": "while "
+    },
+    {
+     "time": 23.14,
+     "duration": 0.29,
+     "text": "it "
+    },
+    {
+     "time": 23.43,
+     "duration": 0.29,
+     "text": "is "
+    },
+    {
+     "time": 23.72,
+     "duration": 0.515,
+     "text": "glowing"
+    }
+   ]
+  },
+  {
+   "time": 25.135,
+   "text": "旧唱片还在转个不停",
+   "words": [
+    {
+     "time": 25.135,
+     "duration": 0.34,
+     "text": "旧"
+    },
+    {
+     "time": 25.475,
+     "duration": 0.42,
+     "text": "唱"
+    },
+    {
+     "time": 25.895,
+     "duration": 0.26,
+     "text": "片"
+    },
+    {
+     "time": 26.155,
+     "duration": 0.42,
+     "text": "还"
+    },
+    {
+     "time": 26.575,
+     "duration": 0.34,
+     "text": "在"
+    },
+    {
+     "time": 26.915,
+     "duration": 0.3,
+     "text": "转"
+    },
+    {
+     "time": 27.215,
+     "duration": 0.26,
+     "text": "个"
+    },
+    {
+     "time": 27.475,
+     "duration": 0.3,
+     "text": "不"
+    },
+    {
+     "time": 27.775,
+     "duration": 0.34,
+     "text": "停"
+    }
+   ]
+  },
+  {
+   "time": 29.015,
+   "text": "你说过的话还很清晰",
+   "words": [
+    {
+     "time": 29.015,
+     "duration": 0.26,
+     "text": "你"
+    },
+    {
+     "time": 29.275,
+     "duration": 0.38,
+     "text": "说"
+    },
+    {
+     "time": 29.655,
+     "duration": 0.34,
+     "text": "过"
+    },
+    {
+     "time": 29.995,
+     "duration": 0.26,
+     "text": "的"
+    },
+    {
+     "time": 30.255,
+     "duration": 0.26,
+     "text": "话"
+    },
+    {
+     "time": 30.515,
+     "duration": 0.42,
+     "text": "还"
+    },
+    {
+     "time": 30.935,
+     "duration": 0.3,
+     "text": "很"
+    },
+    {
+     "time": 31.235,
+     "duration": 0.26,
+     "text": "清"
+    },
+    {
+     "time": 31.495,
+     "duration": 0.42,
+     "text": "晰"
+    }
+   ]
+  },
+  {
+   "time": 32.815,
+   "text": "We were dancing in the quiet rain",
+   "words": [
+    {
+     "time": 32.815,
+     "duration": 0.29,
+     "text": "We "
+    },
+    {
+     "time": 33.105,
+     "duration": 0.38,
+     "text": "were "
+    },
+    {
+     "time": 33.485,
+     "duration": 0.515,
+     "text": "dancing "
+    },
+    {
+     "time": 34,
+     "duration": 0.29,
+     "text": "in "
+    },
+    {
+     "time": 34.29,
+     "duration": 0.335,
+     "text": "the "
+    },
+    {
+     "time": 34.625,
+     "duration": 0.425,
+     "text": "quiet "
+    },
+    {
+     "time": 35.05,
+     "duration": 0.38,
+     "text": "rain"
+    }
+   ]
+  },
+  {
+   "time": 36.33,
+   "text": "把心事折成纸飞机",
+   "words": [
+    {
+     "time": 36.33,
+     "duration": 0.3,
+     "text": "把"
+    },
+    {
+     "time": 36.63,
+     "duration": 0.26,
+     "text": "心"
+    },
+    {
+     "time": 36.89,
+     "duration": 0.34,
+     "text": "事"
+    },
+    {
+     "time": 37.23,
+     "duration": 0.26,
+     "text": "折"
+    },
+    {
+     "time": 37.49,
+     "duration": 0.42,
+     "text": "成"
+    },
+    {
+     "time": 37.91,
+     "duration": 0.26,
+     "text": "纸"
+    },
+    {
+     "time": 38.17,
+     "duration": 0.42,
+     "text": "飞"
+    },
+    {
+     "time": 38.59,
+     "duration": 0.3,
+     "text": "机"
+    }
+   ]
+  },
+  {
+   "time": 39.79,
+   "text": "飞过那片安静的海",
+   "words": [
+    {
+     "time": 39.79,
+     "duration": 0.42,
+     "text": "飞"
+    },
+    {
+     "time": 40.21,
+     "duration": 0.34,
+     "text": "过"
+    },
+    {
+     "time": 40.55,
+     "duration": 0.34,
+     "text": "那"
+    },
+    {
+     "time": 40.89,
+     "duration": 0.26,
+     "text": "片"
+    },
+    {
+     "time": 41.15,
+     "duration": 0.38,
+     "text": "安"
+    },
+    {
+     "time": 41.53,
+     "duration": 0.26,
+     "text": "静"
+    },
+    {
+     "time": 41.79,
+     "duration": 0.26,
+     "text": "的"
+    },
+    {
+     "time": 42.05,
+     "duration": 0.38,
+     "text": "海"
+    }
+   ]
+  },
+  {
+   "time": 43.33,
+   "text": "Every echo calls your name again",
+   "words": [
+    {
+     "time": 43.33,
+     "duration": 0.425,
+     "text": "Every "
+    },
+    {
+     "time": 43.755,
+     "duration": 0.38,
+     "text": "echo "
+    },
+    {
+     "time": 44.135,
+     "duration": 0.425,
+     "text": "calls "
+    },
+    {
+     "time": 44.56,
+     "duration": 0.38,
+     "text": "your "
+    },
+    {
+     "time": 44.94,
+     "duration": 0.38,
+     "text": "name "
+    },
+    {
+     "time": 45.32,
+     "duration": 0.425,
+     "text": "again"
+    }
+   ]
+  },
+  {
+   "time": 46.645,
+   "text": "时间像潮水退去又回来",
+   "words": [
+    {
+     "time": 46.645,
+     "duration": 0.34,
+     "text": "时"
+    },
+    {
+     "time": 46.985,
+     "duration": 0.38,
+     "text": "间"
+    },
+    {
+     "time": 47.365,
+     "duration": 0.34,
+     "text": "像"
+    },
+    {
+     "time": 47.705,
+     "duration": 0.3,
+     "text": "潮"
+    },
+    {
+     "time": 48.005,
+     "duration": 0.26,
+     "text": "水"
+    },
+    {
+     "time": 48.265,
+     "duration": 0.42,
+     "text": "退"
+    },
+    {
+     "time": 48.685,
+     "duration": 0.26,
+     "text": "去"
+    },
+    {
+     "time": 48.945,
+     "duration": 0.38,
+     "text": "又"
+    },
+    {
+     "time": 49.325,
+     "duration": 0.38,
+     "text": "回"
+    },
+    {
+     "time": 49.705,
+     "duration": 0.42,
+     "text": "来"
+    }
+   ]
+  },
+  {
+   "time": 51.025,
+   "text": "留下贝壳和一点点期待",
+   "words": [
+    {
+     "time": 51.025,
+     "duration": 0.3,
+     "text": "留"
+    },
+    {
+     "time": 51.325,
+     "duration": 0.42,
+     "text": "下"
+    },
+    {
+     "time": 51.745,
+     "duration": 0.26,
+     "text": "贝"
+    },
+    {
+     "time": 52.005,
+     "duration": 0.3,
+     "text": "壳"
+    },
+    {
+     "time": 52.305,
+     "duration": 0.42,
+     "text": "和"
+    },
+    {
+     "time": 52.725,
+     "duration": 0.38,
+     "text": "一"
+    },
+    {
+     "time": 53.105,
+     "duration": 0.34,
+     "text": "点"
+    },
+    {
+     "time": 53.445,
+     "duration": 0.34,
+     "text": "点"
+    },
+    {
+     "time": 53.785,
+     "duration": 0.42,
+     "text": "期"
+    },
+    {
+     "time": 54.205,
+     "duration": 0.38,
+     "text": "待"
+    }
+   ]
+  },
+  {
+   "time": 55.485,
+   "text": "Turn the radio up and sing along",
+   "words": [
+    {
+     "time": 55.485,
+     "duration": 0.38,
+     "text": "Turn "
+    },
+    {
+     "time": 55.865,
+     "duration": 0.335,
+     "text": "the "
+    },
+    {
+     "time": 56.2,
+     "duration": 0.425,
+     "text": "radio "
+    },
+    {
+     "time": 56.625,
+     "duration": 0.29,
+     "text": "up "
+    },
+    {
+     "time": 56.915,
+     "duration": 0.335,
+     "text": "and "
+    },
+    {
+     "time": 57.25,
+     "duration": 0.38,
+     "text": "sing "
+    },
+    {
+     "time": 57.63,
+     "duration": 0.425,
+     "text": "along"
+    }
+   ]
+  },
+  {
+   "time": 58.955,
+   "text": "天亮以前别说再见",
+   "words": [
+    {
+     "time": 58.955,
+     "duration": 0.26,
+     "text": "天"
+    },
+    {
+     "time": 59.215,
+     "duration": 0.34,
+     "text": "亮"
+    },
+    {
+     "time": 59.555,
+     "duration": 0.34,
+     "text": "以"
+    },
+    {
+     "time": 59.895,
+     "duration": 0.42,
+     "text": "前"
+    },
+    {
+     "time": 60.315,
+     "duration": 0.26,
+     "text": "别"
+    },
+    {
+     "time": 60.575,
+     "duration": 0.38,
+     "text": "说"
+    },
+    {
+     "time": 60.955,
+     "duration": 0.34,
+     "text": "再"
+    },
+    {
+     "time": 61.295,
+     "duration": 0.26,
+     "text": "见"
+    }
+   ]
+  },
+  {
+   "time": 62.455,
+   "text": "让我们再多走一段",
+   "words": [
+    {
+     "time": 62.455,
+     "duration": 0.38,
+     "text": "让"
+    },
+    {
+     "time": 62.835,
+     "duration": 0.26,
+     "text": "我"
+    },
+    {
+     "time": 63.095,
+     "duration": 0.42,
+     "text": "们"
+    },
+    {
+     "time": 63.515,
+     "duration": 0.34,
+     "text": "再"
+    },
+    {
+     "time": 63.855,
+     "duration": 0.26,
+     "text": "多"
+    },
+    {
+     "time": 64.115,
+     "duration": 0.38,
+     "text": "走"
+    },
+    {
+     "time": 64.495,
+     "duration": 0.38,
+     "text": "一"
+    },
+    {
+     "time": 64.875,
+     "duration": 0.38,
+     "text": "段"
+    }
+   ]
+  },
+  {
+   "time": 66.155,
+   "text": "All the stars are falling into place",
+   "words": [
+    {
+     "time": 66.155,
+     "duration": 0.335,
+     "text": "All "
+    },
+    {
+     "time": 66.49,
+     "duration": 0.335,
+     "text": "the "
+    },
+    {
+     "time": 66.825,
+     "duration": 0.425,
+     "text": "stars "
+    },
+    {
+     "time": 67.25,
+     "duration": 0.335,
+     "text": "are "
+    },
+    {
+     "time": 67.585,
+     "duration": 0.515,
+     "text": "falling "
+    },
+    {
+     "time": 68.1,
+     "duration": 0.38,
+     "text": "into "
+    },
+    {
+     "time": 68.48,
+     "duration": 0.425,
+     "text": "place"
+    }
+   ]
+  },
+  {
+   "time": 69.805,
+   "text": "夜色慢慢落在窗台上",
+   "words": [
+    {
+     "time": 69.805,
+     "duration": 0.34,
+     "text": "夜"
+    },
+    {
+     "time": 70.145,
+     "duration": 0.42,
+     "text": "色"
+    },
+    {
+     "time": 70.565,
+     "duration": 0.26,
+     "text": "慢"
+    },
+    {
+     "time": 70.825,
+     "duration": 0.26,
+     "text": "慢"
+    },
+    {
+     "time": 71.085,
+     "duration": 0.38,
+     "text": "落"
+    },
+    {
+     "time": 71.465,
+     "duration": 0.34,
+     "text": "在"
+    },
+    {
+     "time": 71.805,
+     "duration": 0.38,
+     "text": "窗"
+    },
+    {
+     "time": 72.185,
+     "duration": 0.38,
+     "text": "台"
+    },
+    {
+     "time": 72.565,
+     "duration": 0.38,
+     "text": "上"
+    }
+   ]
+  },
+  {
+   "time": 73.845,
+   "text": "街灯把影子拉得很长",
+   "words": [
+    {
+     "time": 73.845,
+     "duration": 0.38,
+     "text": "街"
+    },
+    {
+     "time": 74.225,
+     "duration": 0.38,
+     "text": "灯"
+    },
+    {
+     "time": 74.605,
+     "duration": 0.3,
+     "text": "把"
+    },
+    {
+     "time": 74.905,
+     "duration": 0.38,
+     "text": "影"
+    },
+    {
+     "time": 75.285,
+     "duration": 0.3,
+     "text": "子"
+    },
+    {
+     "time": 75.585,
+     "duration": 0.42,
+     "text": "拉"
+    },
+    {
+     "time": 76.005,
+     "duration": 0.3,
+     "text": "得"
+    },
+    {
+     "time": 76.305,
+     "duration": 0.3,
+     "text": "很"
+    },
+    {
+     "time": 76.605,
+     "duration": 0.3,
+     "text": "长"
+    }
+   ]
+  },
+  {
+   "time": 77.805,
+   "text": "Every little light keeps on shining",
+   "words": [
+    {
+     "time": 77.805,
+     "duration": 0.425,
+     "text": "Every "
+    },
+    {
+     "time": 78.23,
+     "duration": 0.47,
+     "text": "little "
+    },
+    {
+     "time": 78.7,
+     "duration": 0.425,
+     "text": "light "
+    },
+    {
+     "time": 79.125,
+     "duration": 0.425,
+     "text": "keeps "
+    },
+    {
+     "time": 79.55,
+     "duration": 0.29,
+     "text": "on "
+    },
+    {
+     "time": 79.84,
+     "duration": 0.515,
+     "text": "shining"
+    }
+   ]
+  },
+  {
+   "time": 81.255,
+   "text": "我会记得这一刻的光",
+   "words": [
+    {
+     "time": 81.255,
+     "duration": 0.26,
+     "text": "我"
+    },
+    {
+     "time": 81.515,
+     "duration": 0.26,
+     "text": "会"
+    },
+    {
+     "time": 81.775,
+     "duration": 0.26,
+     "text": "记"
+    },
+    {
+     "time": 82.035,
+     "duration": 0.3,
+     "text": "得"
+    },
+    {
+     "time": 82.335,
+     "duration": 0.26,
+     "text": "这"
+    },
+    {
+     "time": 82.595,
+     "duration": 0.38,
+     "text": "一"
+    },
+    {
+     "time": 82.975,
+     "duration": 0.3,
+     "text": "刻"
+    },
+    {
+     "time": 83.275,
+     "duration": 0.26,
+     "text": "的"
+    },
+    {
+     "time": 83.535,
+     "duration": 0.42,
+     "text": "光"
+    }
+   ]
+  }
+ ]
+}

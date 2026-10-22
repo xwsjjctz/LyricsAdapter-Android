@@ -32,16 +32,42 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `compat-js/` | Node compatibility prelude for plugins; `npm run build` writes `plugin-host/src/main/resources/com/lyricsadapter/pluginhost/compat.js` |
 | `plugin-host/` | Pure Kotlin plugin host: one QuickJS runtime per plugin, JS event loop, host bindings |
 | `plugin-host-spike/` | JVM command line against the live services (`smoke`, `qq-login`) |
-| `spike-android/` | Android app whose instrumented tests run the plugin host on a device |
+| `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
+| `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; it builds `libaudio_tags.so` with cargo-ndk |
 
 ```bash
 (cd compat-js && npm install && npm run build)   # after editing compat-js/src; compat.js is generated
 ./gradlew :plugin-host:test
 ./gradlew :plugin-host-spike:run --args="smoke"
+./gradlew :audio-tags:test                       # builds the host library with cargo first
+./gradlew :audio-tags:generateBindings           # after changing the Rust API
+(cd audio-tags/fixtures && npm install && npm run generate)   # needs ffmpeg and metaflac
 ./gradlew :spike-android:connectedDebugAndroidTest
 ```
 
 Plugins are read from the desktop's install directory `~/.la/plugin/<id>/`.
+Building the Android app needs the NDK, the Rust Android targets and cargo-ndk.
+
+## Tag writing
+
+`audio-tags` must never drop data it does not understand. FLAC and MP3 edits
+split the common fields out of the Vorbis comments / ID3v2 tag, change them and
+merge them back; do not save these formats through lofty's `TaggedFile`, which
+discards every item lofty has no key for (QRC/YRC included).
+`AudioTagsTest` guards this with fixtures carrying a PRIV frame and a custom
+Vorbis field. Word lyrics follow desktop's `wordLyricsTagService.ts`.
+
+## Lyrics
+
+- Desktop parses LRC/QRC/YRC with AMLL (`@applemusic-like-lyrics/lyric`),
+  which is AGPL-3.0-only. Do not translate AMLL code; write the Kotlin parser
+  from the formats and match desktop by comparing with what desktop's own
+  `src/shared/lrcParser.ts` returns (run it under Node, as
+  `spike-android/tools/demo-lyrics.mjs` does).
+- Read the playback position only in draw lambdas and in the active-line
+  `derivedStateOf`, so a frame redraws without recomposing; the spike's
+  `LyricsView` keeps the UI thread under 3 ms per frame this way.
+- Blur and the AGSL background must stay switchable for slower devices.
 
 ## Matching desktop behaviour
 

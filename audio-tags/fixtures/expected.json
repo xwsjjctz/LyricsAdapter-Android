@@ -1,0 +1,89 @@
+{
+  "tagged.mp3": {
+    "title": "晴天",
+    "artist": "周杰伦",
+    "album": "叶惠美",
+    "lyrics": "[ti:晴天]\n[ar:周杰伦]\n[00:00.00]故事的小黄花\n[00:01.00]从出生那年就飘着\n",
+    "wordLyrics": {
+      "format": "qrc",
+      "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<QrcInfos>\n<QrcHeadInfo SaveTime=\"1\" Version=\"100\"/>\n<LyricInfo LyricCount=\"1\">\n<Lyric_1 LyricType=\"1\" LyricContent=\"[ti:晴天]\n[0,1000]故(0,250)事(250,250)的(500,250)小(750,250)\n[1000,1000]Don't(1000,500) (1500,0)stop(1500,500)\n\"/>\n</LyricInfo>\n</QrcInfos>"
+    },
+    "durationMs": 2038,
+    "bitRate": 129,
+    "sampleRate": 44100,
+    "cover": {
+      "mimeType": "image/jpeg",
+      "size": 247,
+      "sha256": "3f34f891ffe8751d12ea8d5a62f0cdc11073b8ad6a89e7a09250a6710c994349"
+    }
+  },
+  "tagged.flac": {
+    "title": "晴天",
+    "artist": "周杰伦",
+    "album": "叶惠美",
+    "lyrics": "[ti:晴天]\n[ar:周杰伦]\n[00:00.00]故事的小黄花\n[00:01.00]从出生那年就飘着\n",
+    "wordLyrics": {
+      "format": "qrc",
+      "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<QrcInfos>\n<QrcHeadInfo SaveTime=\"1\" Version=\"100\"/>\n<LyricInfo LyricCount=\"1\">\n<Lyric_1 LyricType=\"1\" LyricContent=\"[ti:晴天]\n[0,1000]故(0,250)事(250,250)的(500,250)小(750,250)\n[1000,1000]Don't(1000,500) (1500,0)stop(1500,500)\n\"/>\n</LyricInfo>\n</QrcInfos>"
+    },
+    "durationMs": 2000,
+    "bitRate": 123,
+    "sampleRate": 44100,
+    "cover": {
+      "mimeType": "image/png",
+      "size": 177,
+      "sha256": "de18f1a5f289cb6de301be258d9042a8f018d4d582d8661ab79e836b670b8ce0"
+    }
+  },
+  "lowercase-yrc.flac": {
+    "title": "稻香",
+    "artist": null,
+    "album": null,
+    "lyrics": null,
+    "wordLyrics": {
+      "format": "yrc",
+      "text": "[0,1000](0,250,0)故(250,250,0)事(500,250,0)的(750,250,0)小\n[1000,1000](1000,500,0)从(1500,500,0)出\n"
+    },
+    "durationMs": 2000,
+    "bitRate": 123,
+    "sampleRate": 44100,
+    "cover": null
+  },
+  "untagged.mp3": {
+    "title": null,
+    "artist": null,
+    "album": null,
+    "lyrics": null,
+    "wordLyrics": null,
+    "durationMs": 2038,
+    "bitRate": 129,
+    "sampleRate": 44100,
+    "cover": null
+  },
+  "id3v1-only.mp3": {
+    "title": "Old Rip",
+    "artist": "Some Artist",
+    "album": "Old Album",
+    "lyrics": null,
+    "wordLyrics": null,
+    "durationMs": 2038,
+    "bitRate": 129,
+    "sampleRate": 44100,
+    "cover": null
+  },
+  "tagged.m4a": {
+    "title": "晴天",
+    "artist": "周杰伦",
+    "album": "叶惠美",
+    "lyrics": "[ti:晴天]\n[ar:周杰伦]\n[00:00.00]故事的小黄花\n[00:01.00]从出生那年就飘着\n",
+    "wordLyrics": null,
+    "durationMs": 2023,
+    "bitRate": 127,
+    "sampleRate": 44100,
+    "cover": {
+      "mimeType": "image/jpeg",
+      "size": 247,
+      "sha256": "3f34f891ffe8751d12ea8d5a62f0cdc11073b8ad6a89e7a09250a6710c994349"
+    }
+  }
+}

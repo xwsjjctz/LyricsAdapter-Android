@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "lyricsadapter-android"
 
+include(":audio-tags")
 include(":plugin-host")
 include(":plugin-host-spike")
 include(":spike-android")

@@ -1,0 +1,15 @@
+{
+  "name": "@lyrics-adapter/audio-tags-fixtures",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Builds tagged audio fixtures with the desktop app's tag libraries and records what desktop reads from them",
+  "scripts": {
+    "generate": "node generate.mjs",
+    "read": "node read.mjs"
+  },
+  "devDependencies": {
+    "music-tag-native": "1.0.0",
+    "node-id3": "0.2.9"
+  }
+}

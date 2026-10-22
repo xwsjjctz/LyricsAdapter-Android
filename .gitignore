@@ -6,3 +6,7 @@ local.properties
 .idea/
 node_modules/
 .DS_Store
+# Rust build output
+target/
+# Output of IDE Java/Kotlin builders (VS Code, Eclipse)
+bin/

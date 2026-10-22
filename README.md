@@ -1,6 +1,10 @@
 # LyricsAdapter Android
 
-[LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端，目前处于技术验证阶段。第一项验证：桌面端现有的 `.laplugin`（QQ 音乐、网易云，旧 API v1）能否不改代码，直接在安卓上的 QuickJS 里运行。
+[LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端，目前处于技术验证阶段：
+
+1. 桌面端现有的 `.laplugin`（QQ 音乐、网易云，旧 API v1）能否不改代码，直接在安卓上的 QuickJS 里运行。
+2. 能否用桌面同一个标签库 lofty（Rust）经文件描述符读写音频标签，读写结果与桌面一致。
+3. Compose 能否流畅地画出专注模式的逐字歌词（逐字扫光、按距离模糊、弹簧滚动、流光背景）。
 
 ## 结构
 
@@ -9,7 +13,8 @@
 | `compat-js/` | Node 兼容层：`fetch`/`Headers`（Node 语义）、`crypto`（转给平台加解密）、`zlib`/`stream`/`Buffer`/`util`/`assert`（browserify 系 polyfill）、计时器、`URL`、`TextEncoder` 等。`npm run build` 打包成 `plugin-host` 的资源 `compat.js` |
 | `plugin-host/` | 纯 Kotlin 模块（不依赖 `android.*`）：每个插件一个 QuickJS 运行时，常驻 JS 事件循环收发请求；调用白名单、参数上限、`coverUrlFullSize` 映射与桌面仓库的 `electron/services/pluginHandle.ts` 一致 |
 | `plugin-host-spike/` | 桌面 JVM 上的命令行：`smoke` 对真实接口做冒烟检查，`qq-login` 走 QQ 扫码登录后再测需要登录的接口 |
-| `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查 |
+| `audio-tags/` | 标签读写：Rust crate（`rust/`，lofty 0.25，与桌面的 music-tag-native 同一版本线）经 UniFFI 生成 Kotlin 绑定（`src/main/kotlin`，已生成，改 Rust 后运行 `generateBindings`）。`fixtures/` 用桌面同款库生成带标签的样本和桌面读到的期望值 |
+| `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查；构建时用 cargo-ndk 编出 `libaudio_tags.so`。桌面图标打开的是歌词渲染原型（`src/main/kotlin/.../lyrics/`），演示歌词由 `tools/demo-lyrics.mjs` 交给桌面仓库的 `lrcParser.ts` 解析生成，歌词文字是原创的 |
 
 插件代码读取自桌面端安装目录 `~/.la/plugin/<id>/index.cjs`。
 
@@ -20,10 +25,21 @@
 ./gradlew :plugin-host:test                             # 兼容层单元测试（加解密/zlib 与 Node 逐字节对照）
 ./gradlew :plugin-host-spike:run --args="smoke"         # 真实接口，无需登录
 ./gradlew :plugin-host-spike:run --args="qq-login"      # 打印二维码路径，用 QQ 音乐扫码
+./gradlew :audio-tags:test                              # 标签读写与桌面对照（先用 cargo 编本机库）
+./gradlew :audio-tags:generateBindings                  # 改了 Rust 接口后重新生成 Kotlin 绑定
+(cd audio-tags/fixtures && npm install && npm run generate)  # 重新生成样本与期望值，需要 ffmpeg 和 metaflac
 ./gradlew :spike-android:connectedDebugAndroidTest      # 需要已连接的设备或模拟器
+./gradlew :spike-android:installBenchmark               # 测歌词帧率用不可调试的 benchmark 构建
+node spike-android/tools/demo-lyrics.mjs ../LyricsAdapter    # 重新生成演示歌词，参数是桌面仓库路径
 ```
 
-安卓工程需要 `local.properties` 里的 `sdk.dir`，以及 SDK Platform 37（OkHttp 5.5 要求 `compileSdk >= 37`）。
+在手机上看歌词渲染：装上 benchmark 构建，打开「LyricsAdapter spike」，左上角每 5 秒刷新一次帧率、掉帧率和 UI 线程耗时；同样的数据输出到 logcat（`adb logcat -s LASpike`）。关掉某项效果对比开销：
+
+```sh
+adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez blur false --ez background false
+```
+
+安卓工程需要 `local.properties` 里的 `sdk.dir`、SDK Platform 37（OkHttp 5.5 要求 `compileSdk >= 37`）、NDK，以及 Rust 工具链（`aarch64-linux-android`、`x86_64-linux-android` 目标和 `cargo-ndk`）。
 
 ## 验证结果（2026-10-22）
 
@@ -33,6 +49,19 @@
 - 3 次搜索串行 4.2 s，并行 1.4 s：同一插件的多个调用可以并发。
 - quickjs-kt 的 `.so` 已按 16 KB 页对齐。
 
+标签读写：
+
+- JVM：9/9。6 个样本（MP3/FLAC/M4A，含 QRC、YRC、小写键名、无标签文件、只有 ID3v1 的老文件）的标题、艺术家、专辑、歌词、逐字歌词、时长、码率、采样率、封面与桌面读取逐项一致；安卓写出的文件再用桌面的库读取，结果正确。
+- 模拟器：经文件描述符读取多数文件约 1 ms（刚开机时个别到 18 ms），写入约 30 ms；`libaudio_tags.so` 在 arm64 上 1.3 MB，16 KB 页对齐。
+- FLAC、MP3 的编辑不经过 lofty 的通用标签整体保存，而是拆分、修改再合并，所以 lofty 不认识的条目（QRC/YRC、PRIV 帧、自定义 Vorbis 字段）都会保留。只有 ID3v1 的 MP3 第一次编辑时，新建的 ID3v2 会先带上 ID3v1 的内容。桌面现在用 music-tag-native 整体保存，只改 FLAC 的标题或封面就会丢掉 QRC/YRC，这是桌面端需要修的问题。
+- 与桌面的差异：安卓写出的 MP3 是 ID3v2.4；桌面写入逐字歌词后会被 node-id3 改成 v2.3。两种版本两边都能读。
+
+歌词渲染（benchmark 构建，Pixel 7 模拟器用宿主 GPU，60 Hz）：
+
+- 全部效果打开时稳定 60 fps，掉帧 0%，换行滚动时也没有掉帧。
+- 歌词视图每帧的 UI 线程耗时 p50 1.7 ms、p95 2.8 ms，关掉模糊和背景后是 1.5–1.6 ms。播放时间只在绘制阶段读取，每帧只重绘、不重组。
+- 模拟器的 CPU 总耗时固定在约 18 ms，开关效果都一样，是模拟器渲染管线的开销。所以模糊和 AGSL 背景的 GPU 成本还要在真机上看，尤其是 120 Hz 的中低端机。
+
 ## 已知问题与待办
 
 - 网易云、QQ 的音频 CDN 返回 `http://` 地址，安卓默认禁止明文流量。网易云 CDN 换成 https 同样返回 206；正式版应优先自动升级到 https，用户自建 WebDAV（局域网 http）另行处理。
@@ -40,3 +69,7 @@
 - 尚未实现新格式插件（`activate(context)`，如歌词翻译）的 SDK：`network.fetchText`、`storage`、`secrets`、`cache`、`configuration`。
 - 插件和应用在同一进程（每个插件一个独立运行时）。要做到桌面那样的崩溃隔离，需要移到 `:plugin` 进程；事件循环异常退出后应由上层重建运行时。
 - 兼容层 693 KB（未压缩）。启动已经够快，之后可以再压缩，或缓存 QuickJS 字节码。
+- 标签写入是原地修改，中途被杀可能损坏文件；正式版应先写到临时副本再替换，或至少在写之前备份。
+- 发布版开启 R8 时需要为 JNA 和 UniFFI 生成的类加 keep 规则；armeabi-v7a 设备需要再加一个 Rust 目标。
+- M4A 等其他格式仍走通用标签整体保存，lofty 不认识的条目会丢失。
+- 歌词原型还没有：每个字的上浮动画、长音的光晕、按封面取色、手动拖动歌词后再回到当前行；安卓端自己的歌词解析器也还没写（要和桌面的解析结果对照）。

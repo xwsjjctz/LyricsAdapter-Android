@@ -1,0 +1,29 @@
+[package]
+name = "audio-tags"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "audio_tags"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+# Same lofty line as the desktop's music-tag-native, so both read and write tags alike.
+lofty = "0.25"
+thiserror = "2"
+uniffi = "0.32"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = "symbols"
