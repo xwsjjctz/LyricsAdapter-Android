@@ -37,7 +37,7 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
 | `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns |
 | `library/` | Pure Kotlin library model: `Track` and building one from read tags |
-| `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files; paths follow desktop's `webdavPath.ts` |
+| `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
 | `app/` | The Android app: SAF import into Room, Media3 playback service, Compose library list, mini player and focus-mode lyrics |
 | `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
 | `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
@@ -57,6 +57,16 @@ node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cas
 
 Plugins are read from the desktop's install directory `~/.la/plugin/<id>/`.
 Building the Android app needs the NDK, the Rust Android targets and cargo-ndk.
+
+## Cloud library
+
+The cloud slot reads the WebDAV library the way desktop's `useWebDAV` does:
+list the root directory, trust a `Metadata/_manifest.json` entry while its
+size and `getlastmodified` still match the file, fill covers and lyrics from
+the chunks in the background, and read tags from the first bytes of a song
+the manifest does not describe. Android does not write the metadata folder
+yet; desktop keeps it up to date. Playback adds Basic authentication only for
+the WebDAV host (`PlaybackService`), so redirects to a CDN never carry it.
 
 ## Tag writing
 

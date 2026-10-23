@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

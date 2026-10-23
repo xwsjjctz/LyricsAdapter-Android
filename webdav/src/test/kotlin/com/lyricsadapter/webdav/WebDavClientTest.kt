@@ -68,6 +68,16 @@ class WebDavClientTest {
     }
 
     @Test
+    fun `fetches a byte range, and cuts a whole file sent by a server that ignores ranges`() = runTest {
+        server.enqueue(MockResponse.Builder().code(206).body("abc").build())
+        server.enqueue(MockResponse.Builder().code(200).body("abcdefgh").build())
+
+        assertEquals("abc", client().fetchRange("/a.flac", 0, 2).decodeToString())
+        assertEquals("bytes=0-2", server.takeRequest().headers["Range"])
+        assertEquals("abc", client().fetchRange("/a.flac", 0, 2).decodeToString())
+    }
+
+    @Test
     fun `returns null for a missing text file`() = runTest {
         server.enqueue(MockResponse.Builder().code(404).build())
 

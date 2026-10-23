@@ -36,12 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.data.CloudStatus
 import com.lyricsadapter.app.data.ColorMode
 import com.lyricsadapter.app.data.EditResult
 import com.lyricsadapter.app.data.FocusSettings
@@ -68,6 +70,8 @@ fun AppScreen(container: AppContainer) {
     val player = container.player
     val settings = container.settings
     val localTracks by library.tracks.collectAsStateWithLifecycle()
+    val cloudTracks by container.cloud.tracks.collectAsStateWithLifecycle()
+    val cloudStatus by container.cloud.status.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
     val slot by settings.activeSlot.value.collectAsStateWithLifecycle()
     val volume by container.volume.level.collectAsStateWithLifecycle(initialValue = container.volume.current())
@@ -92,9 +96,22 @@ fun AppScreen(container: AppContainer) {
     val importFiles = { pickFiles.launch(arrayOf("audio/*")) }
     LaunchedEffect(library) { library.events.collect { notice -> context.showNotice(notice) } }
 
-    val slotTracks = if (slot == SlotId.Local) localTracks else emptyList()
-    val slotCounts = mapOf(SlotId.Local to localTracks.size, SlotId.Cloud to 0, SlotId.Online to 0, SlotId.Playlist to 0)
-    val current = localTracks.firstOrNull { it.id == playerState.currentId }
+    val cloudList = remember(cloudTracks) { cloudTracks.map { it.toTrack() } }
+    val slotTracks = when (slot) {
+        SlotId.Local -> localTracks
+        SlotId.Cloud -> cloudList
+        SlotId.Online, SlotId.Playlist -> emptyList()
+    }
+    val slotCounts = mapOf(SlotId.Local to localTracks.size, SlotId.Cloud to cloudList.size, SlotId.Online to 0, SlotId.Playlist to 0)
+    val current = localTracks.firstOrNull { it.id == playerState.currentId } ?: cloudList.firstOrNull { it.id == playerState.currentId }
+    // The cloud is listed again the first time it is shown in a session, as desktop does on connecting.
+    var cloudRefreshed by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(slot, cloudStatus) {
+        if (slot == SlotId.Cloud && cloudStatus == CloudStatus.Idle && !cloudRefreshed) {
+            cloudRefreshed = true
+            container.cloud.refresh()
+        }
+    }
     val editing = localTracks.firstOrNull { it.id == editingId }
     val switchSlot = { target: SlotId ->
         selection = null
@@ -131,6 +148,7 @@ fun AppScreen(container: AppContainer) {
             shuffleAll = { player.playShuffled(slotTracks) },
             toggleColorMode = { settings.colorMode.set(if (colors.isDark) ColorMode.Light else ColorMode.Dark) },
             openSettings = { settingsPage = it },
+            refreshCloud = if (cloudStatus != CloudStatus.NotConnected) container.cloud::refresh else null,
         ),
     )
 
@@ -157,14 +175,16 @@ fun AppScreen(container: AppContainer) {
                 onRemove = library::remove,
                 onSwitchSlot = switchSlot,
                 onSearch = { palette = PaletteMode.Library },
-                onEmptyAction = {
-                    when (slot) {
-                        SlotId.Local -> importFiles()
-                        SlotId.Cloud -> settingsPage = SettingsPage.Cloud
-                        SlotId.Online, SlotId.Playlist -> palette = PaletteMode.Library
-                    }
-                },
             ),
+            empty = emptyContent(
+                slot = slot,
+                cloudStatus = cloudStatus,
+                importFiles = importFiles,
+                openCloudSettings = { settingsPage = SettingsPage.Cloud },
+                refreshCloud = container.cloud::refresh,
+                search = { palette = PaletteMode.Library },
+            ),
+            status = if (slot == SlotId.Cloud && cloudStatus == CloudStatus.Loading) stringResource(R.string.cloud_loading) else null,
         )
         if (current != null) {
             MiniPlayer(
@@ -202,6 +222,27 @@ fun AppScreen(container: AppContainer) {
             if (editing != null) MetadataEditor(editing, onSave = { edit, done -> library.edit(editing, edit, done) }, onClose = { editingId = null })
         }
     }
+}
+
+/** What each slot says while it has no songs, and what fills it. */
+@Composable
+private fun emptyContent(
+    slot: SlotId,
+    cloudStatus: CloudStatus,
+    importFiles: () -> Unit,
+    openCloudSettings: () -> Unit,
+    refreshCloud: () -> Unit,
+    search: () -> Unit,
+): EmptyContent = when (slot) {
+    SlotId.Local -> EmptyContent(stringResource(R.string.empty_local), stringResource(R.string.import_files), importFiles)
+    SlotId.Cloud -> when (cloudStatus) {
+        CloudStatus.NotConnected -> EmptyContent(stringResource(R.string.empty_cloud), stringResource(R.string.open_settings), openCloudSettings)
+        CloudStatus.Loading -> EmptyContent(stringResource(R.string.cloud_loading), null, {})
+        CloudStatus.Idle -> EmptyContent(stringResource(R.string.cloud_empty), stringResource(R.string.cloud_refresh), refreshCloud)
+        is CloudStatus.Failed -> EmptyContent(stringResource(R.string.cloud_failed, cloudStatus.message), stringResource(R.string.retry), refreshCloud)
+    }
+    SlotId.Online -> EmptyContent(stringResource(R.string.empty_online), stringResource(R.string.search), search)
+    SlotId.Playlist -> EmptyContent(stringResource(R.string.empty_playlist), stringResource(R.string.search), search)
 }
 
 private fun Context.showNotice(notice: LibraryNotice) {

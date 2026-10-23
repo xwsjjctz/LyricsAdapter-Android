@@ -75,6 +75,26 @@ class WebDavClient(
         }
     }
 
+    /** Bytes [start] to [endInclusive] of a file; servers that ignore ranges send the whole file, which is cut to size. */
+    suspend fun fetchRange(path: String, start: Long, endInclusive: Long): ByteArray = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(WebDavPath.url(config.serverUrl, path))
+            .header("Authorization", authorization)
+            .header("Range", "bytes=$start-$endInclusive")
+            .get()
+            .build()
+        execute(request) { response ->
+            if (!response.isSuccessful) throw WebDavException("GET failed: ${response.code} ${response.message}".trim())
+            val wanted = (endInclusive - start + 1).toInt()
+            response.body.source().use { source ->
+                if (response.code != 206 && start > 0) source.skip(start)
+                val buffer = okio.Buffer()
+                while (buffer.size < wanted && source.read(buffer, (wanted - buffer.size).coerceAtMost(SEGMENT)) != -1L) Unit
+                buffer.readByteArray()
+            }
+        }
+    }
+
     /** The URL to stream [path] from, with the header that authorises it. */
     fun streamUrl(path: String): String = WebDavPath.url(config.serverUrl, path).toString()
 
@@ -140,6 +160,7 @@ class WebDavClient(
     private fun NodeList.elements(): List<Element> = (0 until length).mapNotNull { item(it) as? Element }
 
     private companion object {
+        const val SEGMENT = 64L * 1024
         val XML = "application/xml; charset=utf-8".toMediaType()
         const val PROPFIND_BODY = """<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/></d:prop></d:propfind>"""
     }

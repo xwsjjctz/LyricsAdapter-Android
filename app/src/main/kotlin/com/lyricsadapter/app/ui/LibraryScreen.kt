@@ -75,8 +75,10 @@ class LibraryActions(
     val onRemove: (Set<String>) -> Unit,
     val onSwitchSlot: (SlotId) -> Unit,
     val onSearch: () -> Unit,
-    val onEmptyAction: () -> Unit,
 )
+
+/** What an empty slot says, and the one action that fills it, if any. */
+class EmptyContent(val message: String, val actionLabel: String?, val onAction: () -> Unit)
 
 /**
  * One library slot as a list in desktop's Apple Music style: a pinned header
@@ -96,6 +98,8 @@ fun LibraryScreen(
     selection: Set<String>?,
     onSelectionChange: (Set<String>?) -> Unit,
     actions: LibraryActions,
+    empty: EmptyContent,
+    status: String? = null,
 ) {
     val colors = LocalAppColors.current
     var pendingRemoval by remember { mutableStateOf<Set<String>?>(null) }
@@ -106,11 +110,11 @@ fun LibraryScreen(
         if (selection != null) {
             SelectionHeader(tracks, selection, onSelectionChange)
         } else {
-            LibraryHeader(slot, tracks, slotCounts, actions)
+            LibraryHeader(slot, tracks, slotCounts, actions, status)
         }
         Box(Modifier.weight(1f)) {
             if (tracks.isEmpty()) {
-                EmptySlot(slot, actions.onEmptyAction, Modifier.fillMaxSize())
+                EmptySlot(slot, empty, Modifier.fillMaxSize())
             } else {
                 LazyColumn(
                     state = listState,
@@ -174,7 +178,7 @@ private val SlotId.hasTrackMenu: Boolean get() = this == SlotId.Local || this ==
 private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
 
 @Composable
-private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<SlotId, Int>, actions: LibraryActions) {
+private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<SlotId, Int>, actions: LibraryActions, status: String?) {
     val colors = LocalAppColors.current
     var switcherAt by remember { mutableStateOf<IntOffset?>(null) }
     var titleCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -203,7 +207,7 @@ private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<Slo
                 Icon(R.drawable.ui_expand_more, colors.secondaryText, Modifier.padding(start = 2.dp, top = 4.dp), size = 28.dp)
             }
             BasicText(
-                pluralStringResource(R.plurals.library_summary, tracks.size, tracks.size, formatTotalDuration(tracks.sumOf { it.durationMs })),
+                status ?: pluralStringResource(R.plurals.library_summary, tracks.size, tracks.size, formatTotalDuration(tracks.sumOf { it.durationMs })),
                 style = TextStyle(color = colors.secondaryText, fontSize = 14.sp),
             )
         }
@@ -317,22 +321,18 @@ private fun TrackRow(track: Track, playing: Boolean, selected: Boolean?, onClick
 
 /** Each slot says how it gets filled, with the one action that fills it. */
 @Composable
-private fun EmptySlot(slot: SlotId, onAction: () -> Unit, modifier: Modifier) {
+private fun EmptySlot(slot: SlotId, empty: EmptyContent, modifier: Modifier) {
     val colors = LocalAppColors.current
-    val (message, action) = when (slot) {
-        SlotId.Local -> R.string.empty_local to R.string.import_files
-        SlotId.Cloud -> R.string.empty_cloud to R.string.open_settings
-        SlotId.Online -> R.string.empty_online to R.string.search
-        SlotId.Playlist -> R.string.empty_playlist to R.string.search
-    }
     Column(modifier.padding(horizontal = 32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(slot.iconRes, colors.secondaryText.copy(alpha = 0.6f), size = 48.dp)
         Spacer(Modifier.height(12.dp))
         BasicText(
-            stringResource(message),
+            empty.message,
             style = TextStyle(color = colors.secondaryText, fontSize = 15.sp, lineHeight = 22.sp, textAlign = TextAlign.Center),
         )
-        Spacer(Modifier.height(16.dp))
-        PillButton(stringResource(action), onClick = onAction)
+        if (empty.actionLabel != null) {
+            Spacer(Modifier.height(16.dp))
+            PillButton(empty.actionLabel, onClick = empty.onAction)
+        }
     }
 }

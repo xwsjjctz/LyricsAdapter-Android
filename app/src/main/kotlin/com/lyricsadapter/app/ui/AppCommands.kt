@@ -29,6 +29,8 @@ class CommandDeps(
     val shuffleAll: () -> Unit,
     val toggleColorMode: () -> Unit,
     val openSettings: (SettingsPage) -> Unit,
+    /** Null while no WebDAV library is connected. */
+    val refreshCloud: (() -> Unit)?,
 )
 
 /**
@@ -60,6 +62,9 @@ fun appCommands(deps: CommandDeps): List<PaletteCommand> {
     )
     return buildList {
         addAll(sources)
+        deps.refreshCloud?.let { refresh ->
+            add(PaletteCommand("library.refreshCloud", CommandGroup.Library, stringResource(R.string.cloud_refresh), R.drawable.ui_sync, keywords = listOf("webdav", "cloud"), run = refresh))
+        }
         add(PaletteCommand("library.import", CommandGroup.Library, stringResource(R.string.import_files), R.drawable.ui_library_add, keywords = listOf("import"), run = deps.importFiles))
         if (deps.hasTracks) {
             add(PaletteCommand("library.select", CommandGroup.Library, stringResource(R.string.select_multiple), R.drawable.ui_checklist, run = deps.selectMultiple))

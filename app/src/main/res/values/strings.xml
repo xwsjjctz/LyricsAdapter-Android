@@ -17,6 +17,11 @@
     <string name="empty_online">在搜索里播放或添加的在线歌曲会出现在这里</string>
     <string name="empty_playlist">登录音乐源后，可以在搜索里打开歌单</string>
     <string name="open_settings">打开设置</string>
+    <string name="cloud_loading">正在读取云端曲库…</string>
+    <string name="cloud_empty">云端曲库根目录里还没有音频文件</string>
+    <string name="cloud_failed">无法读取云端曲库：%1$s</string>
+    <string name="cloud_refresh">刷新云端曲库</string>
+    <string name="retry">重试</string>
 
     <!-- Library actions -->
     <string name="import_files">导入文件</string>
