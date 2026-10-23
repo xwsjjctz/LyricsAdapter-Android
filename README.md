@@ -1,6 +1,6 @@
 # LyricsAdapter Android
 
-[LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端，目前处于技术验证阶段：
+[LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端。技术验证已完成，正在做第一个可用版本（`app/`）。验证的三件事：
 
 1. 桌面端现有的 `.laplugin`（QQ 音乐、网易云，旧 API v1）能否不改代码，直接在安卓上的 QuickJS 里运行。
 2. 能否用桌面同一个标签库 lofty（Rust）经文件描述符读写音频标签，读写结果与桌面一致。
@@ -14,6 +14,10 @@
 | `plugin-host/` | 纯 Kotlin 模块（不依赖 `android.*`）：每个插件一个 QuickJS 运行时，常驻 JS 事件循环收发请求；调用白名单、参数上限、`coverUrlFullSize` 映射与桌面仓库的 `electron/services/pluginHandle.ts` 一致 |
 | `plugin-host-spike/` | 桌面 JVM 上的命令行：`smoke` 对真实接口做冒烟检查，`qq-login` 走 QQ 扫码登录后再测需要登录的接口 |
 | `audio-tags/` | 标签读写：Rust crate（`rust/`，lofty 0.25，与桌面的 music-tag-native 同一版本线）经 UniFFI 生成 Kotlin 绑定（`src/main/kotlin`，已生成，改 Rust 后运行 `generateBindings`）。`fixtures/` 用桌面同款库生成带标签的样本和桌面读到的期望值 |
+| `lyrics/` | 纯 Kotlin 的 LRC/QRC/YRC 解析与歌词行模型；`fixtures/` 记录桌面 `lrcParser.ts` 对同一批输入的解析结果，测试逐项对照 |
+| `library/` | 纯 Kotlin 的曲库模型：`Track`，以及从读到的标签生成 `Track` |
+| `app/` | 安卓应用：系统文件选择器导入（持久化授权）、标签存入 Room、Media3 后台播放（通知栏、锁屏、耳机拔出暂停）、Apple Music 风格的曲库列表、迷你播放条、专注模式歌词（点歌词跳转） |
+| `buildSrc/` | 两个安卓工程共用的 cargo-ndk 构建任务 |
 | `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查；构建时用 cargo-ndk 编出 `libaudio_tags.so`。桌面图标打开的是歌词渲染原型（`src/main/kotlin/.../lyrics/`），演示歌词由 `tools/demo-lyrics.mjs` 交给桌面仓库的 `lrcParser.ts` 解析生成，歌词文字是原创的 |
 
 插件代码读取自桌面端安装目录 `~/.la/plugin/<id>/index.cjs`。
@@ -28,6 +32,8 @@
 ./gradlew :audio-tags:test                              # 标签读写与桌面对照（先用 cargo 编本机库）
 ./gradlew :audio-tags:generateBindings                  # 改了 Rust 接口后重新生成 Kotlin 绑定
 (cd audio-tags/fixtures && npm install && npm run generate)  # 重新生成样本与期望值，需要 ffmpeg 和 metaflac
+./gradlew :lyrics:test :library:test                   # 歌词解析与桌面对照、曲库模型
+./gradlew :app:installDebug                             # 应用的 debug 构建，包名 com.lyricsadapter.app.debug
 ./gradlew :spike-android:connectedDebugAndroidTest      # 需要已连接的设备或模拟器
 ./gradlew :spike-android:installBenchmark               # 测歌词帧率用不可调试的 benchmark 构建
 node spike-android/tools/demo-lyrics.mjs ../LyricsAdapter    # 重新生成演示歌词，参数是桌面仓库路径
@@ -53,7 +59,7 @@ adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez b
 
 - JVM：9/9。6 个样本（MP3/FLAC/M4A，含 QRC、YRC、小写键名、无标签文件、只有 ID3v1 的老文件）的标题、艺术家、专辑、歌词、逐字歌词、时长、码率、采样率、封面与桌面读取逐项一致；安卓写出的文件再用桌面的库读取，结果正确。
 - 模拟器：经文件描述符读取多数文件约 1 ms（刚开机时个别到 18 ms），写入约 30 ms；`libaudio_tags.so` 在 arm64 上 1.3 MB，16 KB 页对齐。
-- FLAC、MP3 的编辑不经过 lofty 的通用标签整体保存，而是拆分、修改再合并，所以 lofty 不认识的条目（QRC/YRC、PRIV 帧、自定义 Vorbis 字段）都会保留。只有 ID3v1 的 MP3 第一次编辑时，新建的 ID3v2 会先带上 ID3v1 的内容。桌面现在用 music-tag-native 整体保存，只改 FLAC 的标题或封面就会丢掉 QRC/YRC，这是桌面端需要修的问题。
+- FLAC、MP3 的编辑不经过 lofty 的通用标签整体保存，而是拆分、修改再合并，所以 lofty 不认识的条目（QRC/YRC、PRIV 帧、自定义 Vorbis 字段）都会保留。只有 ID3v1 的 MP3 第一次编辑时，新建的 ID3v2 会先带上 ID3v1 的内容。桌面用 music-tag-native 整体保存，曾经在只改 FLAC 标题或封面时丢掉 QRC/YRC，已在桌面仓库 dev 分支 c2c21f6 修复（保存前后保留 QRC/YRC）。
 - 与桌面的差异：安卓写出的 MP3 是 ID3v2.4；桌面写入逐字歌词后会被 node-id3 改成 v2.3。两种版本两边都能读。
 
 歌词渲染（benchmark 构建，Pixel 7 模拟器用宿主 GPU，60 Hz）：
@@ -61,6 +67,13 @@ adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez b
 - 全部效果打开时稳定 60 fps，掉帧 0%，换行滚动时也没有掉帧。
 - 歌词视图每帧的 UI 线程耗时 p50 1.7 ms、p95 2.8 ms，关掉模糊和背景后是 1.5–1.6 ms。播放时间只在绘制阶段读取，每帧只重绘、不重组。
 - 模拟器的 CPU 总耗时固定在约 18 ms，开关效果都一样，是模拟器渲染管线的开销。所以模糊和 AGSL 背景的 GPU 成本还要在真机上看，尤其是 120 Hz 的中低端机。
+
+应用第一个切片（2026-10-23，Pixel 7 模拟器）：
+
+- 歌词解析：桌面 `lrcParser.ts` 的 28 个用例全部一致。
+- 从系统文件选择器多选导入 FLAC（带 QRC 和封面）与 MP3（LRC）：标题、艺术家、专辑、时长、封面正确，冷启动 0.4–0.6 s。
+- 播放：切到后台继续播放，媒体通知正常；点歌词跳到该行开头，位置精确到毫秒；逐字扫光和整行高亮都正常；一首播完自动下一首。
+- 杀掉进程重开：曲库从 Room 恢复，凭持久化授权仍能播放。
 
 ## 已知问题与待办
 
@@ -72,4 +85,5 @@ adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez b
 - 标签写入是原地修改，中途被杀可能损坏文件；正式版应先写到临时副本再替换，或至少在写之前备份。
 - 发布版开启 R8 时需要为 JNA 和 UniFFI 生成的类加 keep 规则；armeabi-v7a 设备需要再加一个 Rust 目标。
 - M4A 等其他格式仍走通用标签整体保存，lofty 不认识的条目会丢失。
-- 歌词原型还没有：每个字的上浮动画、长音的光晕、按封面取色、手动拖动歌词后再回到当前行；安卓端自己的歌词解析器也还没写（要和桌面的解析结果对照）。
+- 歌词原型还没有：每个字的上浮动画、长音的光晕、按封面取色、手动拖动歌词后再回到当前行。
+- 应用尚未有：编辑标签、删除歌曲、播放队列与随机/循环、进度条、搜索、在线音乐与插件接入、WebDAV、设置、宽屏布局。源文件被移动或删除后，曲目会留在列表里但无法播放，需要检测并提示。

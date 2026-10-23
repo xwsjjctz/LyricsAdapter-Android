@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LyricsAdapter</string>
+    <string name="library_title">本地</string>
+    <string name="library_summary">%1$d 首歌曲 · %2$s</string>
+    <string name="library_empty">把手机里的 MP3、FLAC 导入进来</string>
+    <string name="import_files">导入文件</string>
+    <string name="import_done">已导入 %1$d 首</string>
+    <string name="import_failed">%1$d 个文件无法读取</string>
+    <string name="unknown_artist">未知艺术家</string>
+    <string name="no_lyrics">暂无歌词</string>
+    <string name="action_play">播放</string>
+    <string name="action_pause">暂停</string>
+    <string name="action_next">下一首</string>
+    <string name="action_previous">上一首</string>
+    <string name="action_close">关闭</string>
+</resources>

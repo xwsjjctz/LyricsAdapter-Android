@@ -34,36 +34,6 @@ abstract class CopySpikeAssets : DefaultTask() {
     }
 }
 
-/** Builds the audio-tags Rust library for Android with cargo-ndk. */
-abstract class BuildRustLibraries @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
-    @get:InputFiles
-    abstract val sources: ConfigurableFileCollection
-
-    @get:Internal
-    abstract val crateDirectory: DirectoryProperty
-
-    @get:Input
-    abstract val abis: ListProperty<String>
-
-    @get:Input
-    abstract val platform: Property<Int>
-
-    @get:OutputDirectory
-    abstract val outputDirectory: DirectoryProperty
-
-    @TaskAction
-    fun build() {
-        val targets = abis.get().flatMap { listOf("-t", it) }
-        exec.exec {
-            workingDir(crateDirectory)
-            commandLine(
-                listOf("cargo", "ndk") + targets +
-                    listOf("-P", platform.get().toString(), "-o", outputDirectory.get().asFile.absolutePath, "build", "--release", "--lib"),
-            )
-        }
-    }
-}
-
 val copySpikeAssets = tasks.register<CopySpikeAssets>("copySpikeAssets") {
     testPlugin.set(rootProject.layout.projectDirectory.file("plugin-host/src/test/resources/test-plugin.cjs"))
     installedPlugins.set(File(System.getProperty("user.home"), ".la/plugin"))

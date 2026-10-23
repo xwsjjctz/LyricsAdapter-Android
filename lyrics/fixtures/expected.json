@@ -1,0 +1,620 @@
+[
+ {
+  "name": "lrc basic",
+  "lyrics": "[00:01.00]第一行\n[00:02.50]第二行",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "第一行\n第二行",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "第一行"
+    },
+    {
+     "time": 2.5,
+     "text": "第二行"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc three-digit fraction",
+  "lyrics": "[00:01.123]a\n[00:02.5]b\n[00:03.05]c",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "a\nb\nc",
+   "syncedLyrics": [
+    {
+     "time": 1.123,
+     "text": "a"
+    },
+    {
+     "time": 2.5,
+     "text": "b"
+    },
+    {
+     "time": 3.05,
+     "text": "c"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc without fraction",
+  "lyrics": "[00:01]a\n[01:02]b",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "a\nb",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "a"
+    },
+    {
+     "time": 62,
+     "text": "b"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc colon fraction",
+  "lyrics": "[00:01:50]a\n[00:02:00]b",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "a\nb",
+   "syncedLyrics": [
+    {
+     "time": 110,
+     "text": "a"
+    },
+    {
+     "time": 120,
+     "text": "b"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc repeated timestamps",
+  "lyrics": "[00:01.00][00:05.00]副歌\n[00:03.00]主歌",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "副歌\n主歌\n副歌",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "副歌"
+    },
+    {
+     "time": 3,
+     "text": "主歌"
+    },
+    {
+     "time": 5,
+     "text": "副歌"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc unsorted",
+  "lyrics": "[00:05.00]后\n[00:01.00]前\n[00:03.00]中",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "前\n中\n后",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "前"
+    },
+    {
+     "time": 3,
+     "text": "中"
+    },
+    {
+     "time": 5,
+     "text": "后"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc header tags",
+  "lyrics": "[ti:晴天]\n[ar:周杰伦]\n[al:叶惠美]\n[by:someone]\n[offset:500]\n[00:01.00]歌词",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "歌词",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "歌词"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc empty lines and gaps",
+  "lyrics": "[00:01.00]一\n\n[00:02.00]\n[00:03.00]   \n[00:04.00]二",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "一\n二",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "一"
+    },
+    {
+     "time": 4,
+     "text": "二"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc crlf",
+  "lyrics": "[00:01.00]一\r\n[00:02.00]二\r\n",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "一\n二",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "一"
+    },
+    {
+     "time": 2,
+     "text": "二"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc surrounding spaces",
+  "lyrics": "[00:01.00]  hello world  \n[00:02.00]\tTabbed",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "hello world\nTabbed",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "hello world"
+    },
+    {
+     "time": 2,
+     "text": "Tabbed"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc long minutes",
+  "lyrics": "[61:00.00]long\n[120:30.50]longer",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "long\nlonger",
+   "syncedLyrics": [
+    {
+     "time": 3660,
+     "text": "long"
+    },
+    {
+     "time": 7230.5,
+     "text": "longer"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc text before first timestamp",
+  "lyrics": "untimed line\n[00:01.00]timed",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "timed",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "timed"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc brackets in text",
+  "lyrics": "[00:01.00]hello [world]\n[00:02.00](笑)",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "hello [world]\n笑",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "hello [world]"
+    },
+    {
+     "time": 2,
+     "text": "笑"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc parentheses",
+  "lyrics": "[00:01.00](hello) world\n[00:02.00]hello (world)\n[00:03.00]（全角）\n[00:04.00]()\n[00:05.00]( spaced )\n[00:06.00]((double))",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "(hello) world\nhello (world)\n全角\n()\n spaced \n(double)",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "(hello) world"
+    },
+    {
+     "time": 2,
+     "text": "hello (world)"
+    },
+    {
+     "time": 3,
+     "text": "全角"
+    },
+    {
+     "time": 4,
+     "text": "()"
+    },
+    {
+     "time": 5,
+     "text": " spaced "
+    },
+    {
+     "time": 6,
+     "text": "(double)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "lrc fraction digits",
+  "lyrics": "[00:01.1234]four\n[00:02.999]nines\n[00:03.]dot",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "four\nnines",
+   "syncedLyrics": [
+    {
+     "time": 1.123,
+     "text": "four"
+    },
+    {
+     "time": 2.999,
+     "text": "nines"
+    }
+   ]
+  }
+ },
+ {
+  "name": "plain text",
+  "lyrics": "第一行\n第二行\n\n第三行",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "第一行\n第二行\n第三行"
+  }
+ },
+ {
+  "name": "plain text with header tags",
+  "lyrics": "[ti:标题]\n[ar:歌手]\n没有时间轴的歌词",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": "没有时间轴的歌词"
+  }
+ },
+ {
+  "name": "empty",
+  "lyrics": "",
+  "wordLyrics": null,
+  "format": null,
+  "result": {
+   "plainText": ""
+  }
+ },
+ {
+  "name": "qrc basic",
+  "lyrics": "[00:00.00]fallback",
+  "wordLyrics": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<QrcInfos>\n<QrcHeadInfo SaveTime=\"1\" Version=\"100\"/>\n<LyricInfo LyricCount=\"1\">\n<Lyric_1 LyricType=\"1\" LyricContent=\"[ti:晴天]\n[1000,1000]故(1000,250)事(1250,250)的(1500,250)小(1750,250)\n[2000,800]黄(2000,400)花(2400,400)\n\"/>\n</LyricInfo>\n</QrcInfos>",
+  "format": "qrc",
+  "result": {
+   "plainText": "故事的小\n黄花",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "故事的小",
+     "words": [
+      {
+       "time": 1,
+       "duration": 0.25,
+       "text": "故"
+      },
+      {
+       "time": 1.25,
+       "duration": 0.25,
+       "text": "事"
+      },
+      {
+       "time": 1.5,
+       "duration": 0.25,
+       "text": "的"
+      },
+      {
+       "time": 1.75,
+       "duration": 0.25,
+       "text": "小"
+      }
+     ]
+    },
+    {
+     "time": 2,
+     "text": "黄花",
+     "words": [
+      {
+       "time": 2,
+       "duration": 0.4,
+       "text": "黄"
+      },
+      {
+       "time": 2.4,
+       "duration": 0.4,
+       "text": "花"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "qrc english separators",
+  "lyrics": "",
+  "wordLyrics": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<QrcInfos>\n<QrcHeadInfo SaveTime=\"1\" Version=\"100\"/>\n<LyricInfo LyricCount=\"1\">\n<Lyric_1 LyricType=\"1\" LyricContent=\"[0,2000]Don't(0,500) (500,0)stop(500,500) (1000,0)me(1000,1000)\n\"/>\n</LyricInfo>\n</QrcInfos>",
+  "format": "qrc",
+  "result": {
+   "plainText": "Don't stop me",
+   "syncedLyrics": [
+    {
+     "time": 0,
+     "text": "Don't stop me",
+     "words": [
+      {
+       "time": 0,
+       "duration": 0.5,
+       "text": "Don't "
+      },
+      {
+       "time": 0.5,
+       "duration": 0.5,
+       "text": "stop "
+      },
+      {
+       "time": 1,
+       "duration": 1,
+       "text": "me"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "qrc leading separator",
+  "lyrics": "",
+  "wordLyrics": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<QrcInfos>\n<QrcHeadInfo SaveTime=\"1\" Version=\"100\"/>\n<LyricInfo LyricCount=\"1\">\n<Lyric_1 LyricType=\"1\" LyricContent=\" (0,0)Hi(0,500) (500,0)there(500,500)\n\"/>\n</LyricInfo>\n</QrcInfos>",
+  "format": "qrc",
+  "result": {
+   "plainText": ""
+  }
+ },
+ {
+  "name": "qrc xml entities",
+  "lyrics": "",
+  "wordLyrics": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<QrcInfos>\n<QrcHeadInfo SaveTime=\"1\" Version=\"100\"/>\n<LyricInfo LyricCount=\"1\">\n<Lyric_1 LyricType=\"1\" LyricContent=\"[0,1000]&quot;Rock(0,500)&amp;Roll&quot;(500,500)\n[1000,500]&lt;3(1000,500)\n\"/>\n</LyricInfo>\n</QrcInfos>",
+  "format": "qrc",
+  "result": {
+   "plainText": "\"Rock&Roll\"\n<3",
+   "syncedLyrics": [
+    {
+     "time": 0,
+     "text": "\"Rock&Roll\"",
+     "words": [
+      {
+       "time": 0,
+       "duration": 0.5,
+       "text": "\"Rock"
+      },
+      {
+       "time": 0.5,
+       "duration": 0.5,
+       "text": "&Roll\""
+      }
+     ]
+    },
+    {
+     "time": 1,
+     "text": "<3",
+     "words": [
+      {
+       "time": 1,
+       "duration": 0.5,
+       "text": "<3"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "qrc raw content",
+  "lyrics": "",
+  "wordLyrics": "[0,1000]无(0,500)壳(500,500)\n",
+  "format": "qrc",
+  "result": {
+   "plainText": "无壳",
+   "syncedLyrics": [
+    {
+     "time": 0,
+     "text": "无壳",
+     "words": [
+      {
+       "time": 0,
+       "duration": 0.5,
+       "text": "无"
+      },
+      {
+       "time": 0.5,
+       "duration": 0.5,
+       "text": "壳"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "qrc invalid falls back to lrc",
+  "lyrics": "[00:01.00]回退的歌词",
+  "wordLyrics": "not a qrc document",
+  "format": "qrc",
+  "result": {
+   "plainText": "回退的歌词",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "回退的歌词"
+    }
+   ]
+  }
+ },
+ {
+  "name": "yrc basic",
+  "lyrics": "",
+  "wordLyrics": "[1000,1000](1000,500,0)逐(1500,500,0)字\n[2000,1000](2000,1000,0)第二\n",
+  "format": "yrc",
+  "result": {
+   "plainText": "逐字\n第二",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "逐字",
+     "words": [
+      {
+       "time": 1,
+       "duration": 0.5,
+       "text": "逐"
+      },
+      {
+       "time": 1.5,
+       "duration": 0.5,
+       "text": "字"
+      }
+     ]
+    },
+    {
+     "time": 2,
+     "text": "第二",
+     "words": [
+      {
+       "time": 2,
+       "duration": 1,
+       "text": "第二"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "yrc with json credits",
+  "lyrics": "",
+  "wordLyrics": "{\"t\":0,\"c\":[{\"tx\":\"作词: \"},{\"tx\":\"某人\"}]}\n{\"t\":500,\"c\":[{\"tx\":\"作曲: \"},{\"tx\":\"某人\"}]}\n[1000,1000](1000,500,0)逐(1500,500,0)字\n",
+  "format": "yrc",
+  "result": {
+   "plainText": "逐字",
+   "syncedLyrics": [
+    {
+     "time": 1,
+     "text": "逐字",
+     "words": [
+      {
+       "time": 1,
+       "duration": 0.5,
+       "text": "逐"
+      },
+      {
+       "time": 1.5,
+       "duration": 0.5,
+       "text": "字"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "yrc english",
+  "lyrics": "",
+  "wordLyrics": "[0,1500](0,500,0)Hello (500,500,0)my (1000,500,0)friend\n",
+  "format": "yrc",
+  "result": {
+   "plainText": "Hello my friend",
+   "syncedLyrics": [
+    {
+     "time": 0,
+     "text": "Hello my friend",
+     "words": [
+      {
+       "time": 0,
+       "duration": 0.5,
+       "text": "Hello "
+      },
+      {
+       "time": 0.5,
+       "duration": 0.5,
+       "text": "my "
+      },
+      {
+       "time": 1,
+       "duration": 0.5,
+       "text": "friend"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "yrc invalid falls back to lrc",
+  "lyrics": "[00:02.00]备用",
+  "wordLyrics": "{\"t\":0,\"c\":[{\"tx\":\"only credits\"}]}\n",
+  "format": "yrc",
+  "result": {
+   "plainText": "备用",
+   "syncedLyrics": [
+    {
+     "time": 2,
+     "text": "备用"
+    }
+   ]
+  }
+ }
+]

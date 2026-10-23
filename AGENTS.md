@@ -11,7 +11,9 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 - Native Kotlin with Jetpack Compose for UI and Media3 for playback. Playback,
   queues and the four library slots (local, cloud, online, playlist) live on the
   service side (a `MediaLibraryService`), not in the UI, so background controls
-  keep working when the activity is gone.
+  keep working when the activity is gone. The first slice uses a plain
+  `MediaSessionService` with the local library only; switch to
+  `MediaLibraryService` when browsing by external controllers is added.
 - Music-source plugins are the desktop's `.laplugin` packages, run unchanged in
   QuickJS through `compat-js`. Do not port plugin protocols to Kotlin.
 - iOS will be a separate SwiftUI app later. Keep non-UI logic (plugin host,
@@ -33,7 +35,11 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `plugin-host/` | Pure Kotlin plugin host: one QuickJS runtime per plugin, JS event loop, host bindings |
 | `plugin-host-spike/` | JVM command line against the live services (`smoke`, `qq-login`) |
 | `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
-| `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; it builds `libaudio_tags.so` with cargo-ndk |
+| `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns |
+| `library/` | Pure Kotlin library model: `Track` and building one from read tags |
+| `app/` | The Android app: SAF import into Room, Media3 playback service, Compose library list, mini player and focus-mode lyrics |
+| `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
+| `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
 
 ```bash
 (cd compat-js && npm install && npm run build)   # after editing compat-js/src; compat.js is generated
@@ -42,6 +48,9 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 ./gradlew :audio-tags:test                       # builds the host library with cargo first
 ./gradlew :audio-tags:generateBindings           # after changing the Rust API
 (cd audio-tags/fixtures && npm install && npm run generate)   # needs ffmpeg and metaflac
+./gradlew :lyrics:test :library:test
+node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cases; argument is the desktop checkout
+./gradlew :app:installDebug                      # installs as com.lyricsadapter.app.debug
 ./gradlew :spike-android:connectedDebugAndroidTest
 ```
 

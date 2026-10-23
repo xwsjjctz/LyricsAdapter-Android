@@ -10,3 +10,4 @@ node_modules/
 target/
 # Output of IDE Java/Kotlin builders (VS Code, Eclipse)
 bin/
+ref/
