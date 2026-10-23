@@ -18,11 +18,19 @@ import java.io.File
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/**
+ * Desktop's three playback orders (`usePlayback.ts`): the list in order,
+ * starting over after the last track; random tracks; or the current track
+ * again and again. The mode button steps through them in this order.
+ */
+enum class PlaybackMode { Order, Shuffle, RepeatOne }
+
 /** What the UI shows about playback; the position is read on demand instead. */
 data class PlayerState(
     val currentId: String? = null,
     val isPlaying: Boolean = false,
     val durationMs: Long = 0,
+    val mode: PlaybackMode = PlaybackMode.Order,
 )
 
 /**
@@ -47,6 +55,8 @@ class PlayerConnection(private val context: Context) {
         connected.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = publish(player)
         })
+        // A fresh player does not repeat; desktop's order mode starts over at the end of the list.
+        if (connected.repeatMode == Player.REPEAT_MODE_OFF) connected.repeatMode = Player.REPEAT_MODE_ALL
         controller = connected
         publish(connected)
     }
@@ -68,12 +78,25 @@ class PlayerConnection(private val context: Context) {
         controller?.seekToNextMediaItem()
     }
 
+    /** Back to the start of the track, or to the previous one when near the start, like a CD player. */
     fun previous() {
-        controller?.seekToPreviousMediaItem()
+        controller?.seekToPrevious()
     }
 
     fun seekTo(positionMs: Long) {
         controller?.seekTo(positionMs)
+    }
+
+    fun cyclePlaybackMode() {
+        val player = controller ?: return
+        when (modeOf(player)) {
+            PlaybackMode.Order -> player.shuffleModeEnabled = true
+            PlaybackMode.Shuffle -> {
+                player.shuffleModeEnabled = false
+                player.repeatMode = Player.REPEAT_MODE_ONE
+            }
+            PlaybackMode.RepeatOne -> player.repeatMode = Player.REPEAT_MODE_ALL
+        }
     }
 
     /** The controller's estimate of the current position, cheap enough to read every frame. */
@@ -84,7 +107,14 @@ class PlayerConnection(private val context: Context) {
             currentId = player.currentMediaItem?.mediaId,
             isPlaying = player.isPlaying,
             durationMs = player.duration.coerceAtLeast(0),
+            mode = modeOf(player),
         )
+    }
+
+    private fun modeOf(player: Player): PlaybackMode = when {
+        player.repeatMode == Player.REPEAT_MODE_ONE -> PlaybackMode.RepeatOne
+        player.shuffleModeEnabled -> PlaybackMode.Shuffle
+        else -> PlaybackMode.Order
     }
 
     private fun mediaItem(track: Track): MediaItem = MediaItem.Builder()

@@ -14,4 +14,15 @@
     <string name="action_next">下一首</string>
     <string name="action_previous">上一首</string>
     <string name="action_close">关闭</string>
+    <string name="playback_progress">播放进度</string>
+    <string name="volume">音量</string>
+    <string name="action_mute">静音</string>
+    <string name="action_unmute">取消静音</string>
+    <string name="mode_order">顺序播放</string>
+    <string name="mode_shuffle">随机播放</string>
+    <string name="mode_repeat_one">单曲循环</string>
+    <string name="translate">翻译</string>
+    <string name="translating">正在翻译</string>
+    <string name="translated">已翻译</string>
+    <string name="translate_retry">重新翻译</string>
 </resources>

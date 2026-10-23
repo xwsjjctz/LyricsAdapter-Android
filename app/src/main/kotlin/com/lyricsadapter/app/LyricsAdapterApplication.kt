@@ -5,6 +5,7 @@ import android.content.Context
 import com.lyricsadapter.app.data.LibraryDatabase
 import com.lyricsadapter.app.data.TrackImporter
 import com.lyricsadapter.app.playback.PlayerConnection
+import com.lyricsadapter.app.playback.SystemVolume
 import java.io.File
 
 class LyricsAdapterApplication : Application() {
@@ -16,6 +17,7 @@ class AppContainer(context: Context) {
     val database: LibraryDatabase = LibraryDatabase.create(context)
     val importer = TrackImporter(context.contentResolver, database.tracks(), File(context.filesDir, "covers"))
     val player = PlayerConnection(context)
+    val volume = SystemVolume(context)
 }
 
 val Context.container: AppContainer get() = (applicationContext as LyricsAdapterApplication).container

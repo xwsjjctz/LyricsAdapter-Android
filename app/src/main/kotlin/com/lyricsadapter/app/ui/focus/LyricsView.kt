@@ -1,61 +1,72 @@
 package com.lyricsadapter.app.ui.focus
 
 import android.os.Build
+import androidx.compose.animation.core.FloatExponentialDecaySpec
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lyricsadapter.lyrics.LyricLine
-import com.lyricsadapter.lyrics.activeIndex
-import kotlin.math.absoluteValue
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
-/** Where the sung line sits, as a fraction of the view's height from the top. */
-private const val ANCHOR_FRACTION = 0.32f
+private val LINE_STYLE = TextStyle(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, color = UNSUNG)
 
-private val UNSUNG = Color.White.copy(alpha = 0.32f)
-private val SUNG = Color.White
-private val LINE_STYLE = TextStyle(fontSize = 30.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, color = UNSUNG)
+/** After a manual scroll, how long the lyrics wait before following the song again. */
+private const val BROWSE_HOLD_MS = 3_000L
 
 /**
- * Focus-mode lyrics in the AMLL style: the sung line fills word by word, the
- * other lines are shrunk and blurred by their distance, and the list follows
- * the sung line with a soft spring. Playback time is read only while drawing
- * and in the active-line derivation, so most frames redraw without
- * recomposing. Tapping a line seeks to it.
+ * Focus-mode lyrics in the Apple Music style. The sung line sits near the top
+ * and lights word by word; other lines are dim, a little smaller and blurred
+ * by distance. A line change ripples down the list (see [LyricsScroller]).
+ * Dragging scrolls freely and clears the blur; the lyrics return to the sung
+ * line a few seconds later. Tapping a line seeks to it.
+ *
+ * Playback time is read only while drawing and in the active-item
+ * derivation, so most frames redraw without recomposing.
  */
 @Composable
 fun LyricsView(
@@ -63,47 +74,119 @@ fun LyricsView(
     position: () -> Long,
     onLineClick: (LyricLine) -> Unit,
     modifier: Modifier = Modifier,
-    blurLines: Boolean = true,
+    controlsHeight: Dp = 0.dp,
+    controlsShown: () -> Float = { 0f },
 ) {
-    val activeIndex by remember(lines) { derivedStateOf { lines.activeIndex(position()) } }
-    val listState = rememberLazyListState()
+    val items = remember(lines) { buildLyricItems(lines) }
+    val active by remember(items) { derivedStateOf { items.activeItemAt(position()) } }
+    val scroller = remember(items) { LyricsScroller() }
+    val measurer = rememberTextMeasurer()
+    val scope = rememberCoroutineScope()
+    // The manual scroll on top of the song-driven one; zero while following the song.
+    var browse by remember(items) { mutableFloatStateOf(0f) }
+    val browsing by remember { derivedStateOf { browse != 0f } }
+    // Only touched from callbacks, so changing it never recomposes.
+    var browseJob by remember { mutableStateOf<Job?>(null) }
 
-    BoxWithConstraints(modifier) {
-        val anchor = constraints.maxHeight * ANCHOR_FRACTION
-        LaunchedEffect(activeIndex) { listState.follow(activeIndex, anchor) }
-        LazyColumn(
-            state = listState,
-            userScrollEnabled = false,
-            contentPadding = PaddingValues(top = maxHeight * ANCHOR_FRACTION, bottom = maxHeight * (1 - ANCHOR_FRACTION)),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            itemsIndexed(lines) { index, line ->
-                val distance = if (activeIndex < 0) index + 1 else index - activeIndex
-                LyricLineText(line, distance, blurLines, position, onClick = { onLineClick(line) })
+    LaunchedEffect(scroller) {
+        while (true) withFrameNanos { scroller.step(it, active) }
+    }
+
+    fun browseRange(): ClosedFloatingPointRange<Float> {
+        val tops = scroller.tops
+        if (tops.isEmpty()) return 0f..0f
+        val current = tops[active.coerceAtLeast(0)].toFloat()
+        return (current - tops.last())..(current - tops.first())
+    }
+
+    fun followSong(after: Long) {
+        browseJob?.cancel()
+        browseJob = scope.launch {
+            delay(after)
+            animate(browse, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 120f)) { value, _ -> browse = value }
+        }
+    }
+
+    val dragState = rememberDraggableState { delta -> browse = (browse + delta).coerceIn(browseRange()) }
+    val activeRank = items.getOrNull(active)?.rank ?: -1f
+
+    Layout(
+        modifier = modifier
+            .clipToBounds()
+            .fadeEdges(controlsHeight, controlsShown)
+            .draggable(
+                state = dragState,
+                orientation = Orientation.Vertical,
+                onDragStarted = { browseJob?.cancel() },
+                onDragStopped = { velocity ->
+                    browseJob = scope.launch {
+                        animateDecay(browse, velocity, FloatExponentialDecaySpec()) { value, _ -> browse = value.coerceIn(browseRange()) }
+                        delay(BROWSE_HOLD_MS)
+                        animate(browse, 0f, animationSpec = spring(dampingRatio = 0.9f, stiffness = 120f)) { value, _ -> browse = value }
+                    }
+                },
+            ),
+        content = {
+            items.forEachIndexed { index, item ->
+                key(index) {
+                    when (item) {
+                        is LineItem -> LyricLineText(
+                            line = item.line,
+                            distance = item.rank - activeRank,
+                            browsing = browsing,
+                            position = position,
+                            measurer = measurer,
+                            onClick = {
+                                onLineClick(item.line)
+                                followSong(after = 0)
+                            },
+                        )
+                        is InterludeItem -> InterludeDots(item, active = index == active, position = position)
+                    }
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val itemConstraints = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+        val placeables = measurables.map { it.measure(itemConstraints) }
+        val tops = IntArray(placeables.size)
+        var y = 0
+        placeables.forEachIndexed { index, placeable ->
+            tops[index] = y
+            y += placeable.height
+        }
+        val height = constraints.maxHeight
+        scroller.tops = tops
+        scroller.viewportHeight = height
+        layout(constraints.maxWidth, height) {
+            placeables.forEachIndexed { index, placeable ->
+                placeable.placeWithLayer(0, tops[index]) {
+                    val offset = scroller.shift(index) + browse
+                    val top = tops[index] + offset
+                    translationY = offset
+                    // Rows off screen skip drawing, blur included.
+                    alpha = if (top + placeable.height < 0 || top > height) 0f else 1f
+                }
             }
         }
     }
 }
 
-/** Scrolls so line [index] starts [anchor] pixels below the top. */
-private suspend fun LazyListState.follow(index: Int, anchor: Float) {
-    if (index < 0) return
-    val item = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-    if (item == null) {
-        scrollToItem(index)
-        return
-    }
-    val top = item.offset - layoutInfo.viewportStartOffset
-    animateScrollBy(top - anchor, spring(dampingRatio = 0.86f, stiffness = 90f))
-}
-
 @Composable
-private fun LyricLineText(line: LyricLine, distance: Int, blurLines: Boolean, position: () -> Long, onClick: () -> Unit) {
-    val active = distance == 0
-    val emphasis by animateFloatAsState(if (active) 1f else 0f, spring(stiffness = 140f), label = "emphasis")
-    val blurTarget = if (blurLines) distance.absoluteValue.coerceAtMost(4) * 1.5f else 0f
-    val blur by animateFloatAsState(blurTarget, spring(stiffness = 140f), label = "blur")
-    val painter = remember(line) { SungTextPainter(line) }
+private fun LyricLineText(
+    line: LyricLine,
+    distance: Float,
+    browsing: Boolean,
+    position: () -> Long,
+    measurer: TextMeasurer,
+    onClick: () -> Unit,
+) {
+    val active = distance == 0f
+    val emphasis by animateFloatAsState(if (active) 1f else 0f, spring(dampingRatio = 1f, stiffness = 160f), label = "emphasis")
+    val blurTarget = if (browsing || active) 0f else abs(distance).coerceAtMost(6f) * 1.1f
+    val blur by animateFloatAsState(blurTarget, spring(stiffness = 120f), label = "blur")
+    val glowLayer = rememberGraphicsLayer()
+    val painter = remember(line, measurer, glowLayer) { SungLinePainter(line, measurer, LINE_STYLE, glowLayer) }
 
     BasicText(
         text = line.text,
@@ -114,7 +197,7 @@ private fun LyricLineText(line: LyricLine, distance: Int, blurLines: Boolean, po
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .padding(horizontal = 28.dp, vertical = 12.dp)
             .graphicsLayer {
-                val scale = 0.94f + 0.06f * emphasis
+                val scale = 0.97f + 0.03f * emphasis
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0.5f)
@@ -122,60 +205,37 @@ private fun LyricLineText(line: LyricLine, distance: Int, blurLines: Boolean, po
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
             }
             .drawWithContent {
-                drawContent()
-                if (active) painter.drawSung(this, position())
+                if (emphasis > 0f) painter.draw(this, position(), emphasis) else drawContent()
             },
     )
 }
 
+private const val TOP_FADE = 0.08f
+private val BOTTOM_FADE = 36.dp
+
 /**
- * Paints the sung part of one line over its dim text. Finished words are a
- * prefix of the text, clipped by a path cached per word count; the word being
- * sung gets a soft-edged gradient.
+ * Desktop's portrait lyrics mask: the lyrics fade in at the top and out at
+ * the bottom, and run on under the controls, where they are hidden while the
+ * controls show ([controlsShown] at 1) and visible once they hide. The lyrics
+ * themselves never move for it.
  */
-private class SungTextPainter(private val line: LyricLine) {
-    private val wordEnds: IntArray = line.words.runningFold(0) { end, word -> end + word.text.length }.drop(1).toIntArray()
-    private var layout: TextLayoutResult? = null
-    private val prefixPaths = HashMap<Int, Path>()
-    private val wordPaths = HashMap<Int, Pair<Path, Rect>>()
-
-    fun onLayout(result: TextLayoutResult) {
-        layout = result
-        prefixPaths.clear()
-        wordPaths.clear()
+private fun Modifier.fadeEdges(controlsHeight: Dp, controlsShown: () -> Float): Modifier =
+    graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithCache {
+        val height = size.height
+        val cutaway = (controlsHeight.toPx() / height).coerceIn(0f, 0.75f)
+        val fade = (BOTTOM_FADE.toPx() / height).coerceAtMost(0.25f)
+        val clearEnd = (1f - cutaway - fade).coerceAtLeast(TOP_FADE)
+        onDrawWithContent {
+            drawContent()
+            val under = Color.Black.copy(alpha = 1f - controlsShown().coerceIn(0f, 1f))
+            val mask = Brush.verticalGradient(
+                0f to Color.Transparent,
+                TOP_FADE to Color.Black,
+                clearEnd to Color.Black,
+                (1f - cutaway).coerceAtLeast(clearEnd) to under,
+                (1f - fade).coerceAtLeast(clearEnd) to under,
+                1f to Color.Transparent,
+            )
+            drawRect(mask, blendMode = BlendMode.DstIn)
+        }
     }
-
-    fun drawSung(scope: DrawScope, positionMs: Long) {
-        val layout = layout ?: return
-        val words = line.words
-        if (words.isEmpty() || wordEnds.last() != line.text.length) {
-            // A line without word timing is lit as a whole.
-            scope.drawText(layout, color = SUNG)
-            return
-        }
-
-        val finished = words.count { it.endMs <= positionMs }
-        if (finished > 0) {
-            val prefix = prefixPaths.getOrPut(finished) { layout.getPathForRange(0, wordEnds[finished - 1]) }
-            scope.clipPath(prefix) { drawText(layout, color = SUNG) }
-        }
-
-        val word = words.getOrNull(finished) ?: return
-        if (positionMs < word.startMs) return
-        val progress = ((positionMs - word.startMs).toFloat() / word.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f)
-        val (path, bounds) = wordPaths.getOrPut(finished) {
-            val start = if (finished == 0) 0 else wordEnds[finished - 1]
-            val wordPath = layout.getPathForRange(start, wordEnds[finished])
-            wordPath to wordPath.getBounds()
-        }
-        val edge = bounds.left + bounds.width * progress
-        val feather = bounds.height * 0.35f
-        val sweep = Brush.horizontalGradient(
-            0f to SUNG,
-            1f to Color.Transparent,
-            startX = edge - feather,
-            endX = edge + feather,
-        )
-        scope.clipPath(path) { drawText(layout, brush = sweep) }
-    }
-}

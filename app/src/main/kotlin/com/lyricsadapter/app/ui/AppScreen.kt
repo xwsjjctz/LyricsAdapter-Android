@@ -92,7 +92,7 @@ fun AppScreen(container: AppContainer) {
             enter = slideInVertically { it },
             exit = slideOutVertically { it },
         ) {
-            if (current != null) FocusScreen(current, playerState.isPlaying, player, onClose = { focusOpen = false })
+            if (current != null) FocusScreen(current, playerState, player, container.volume, onClose = { focusOpen = false })
         }
     }
 }
