@@ -96,6 +96,7 @@ fun appCommands(deps: CommandDeps): List<PaletteCommand> {
             Triple(SettingsPage.General, R.drawable.ui_settings, "general"),
             Triple(SettingsPage.Focus, R.drawable.ui_tune, "focus"),
             Triple(SettingsPage.Cloud, R.drawable.ui_cloud, "webdav cloud"),
+            Triple(SettingsPage.Plugins, R.drawable.ui_extension, "plugins"),
         ).forEach { (page, icon, keyword) ->
             val title = "$settingsTitle › ${stringResource(page.titleRes)}"
             add(PaletteCommand("settings.${page.name.lowercase()}", CommandGroup.Settings, title, icon, keywords = listOf(keyword)) { deps.openSettings(page) })

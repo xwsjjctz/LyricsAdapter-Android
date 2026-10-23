@@ -218,3 +218,34 @@ fun StatusText(text: String, error: Boolean) {
 
 @Composable
 internal fun SpacerRow() = Spacer(Modifier.size(8.dp))
+
+/** A setting turned on or off, drawn as a phone switch. */
+@Composable
+fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val colors = LocalAppColors.current
+    val position by androidx.compose.animation.core.animateFloatAsState(if (checked) 1f else 0f, label = "switch")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Switch
+                selected = checked
+            }
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicText(title, style = TextStyle(color = colors.text, fontSize = 16.sp), modifier = Modifier.weight(1f))
+        Box(
+            Modifier
+                .size(width = 50.dp, height = 30.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .drawBehind {
+                    drawRect(androidx.compose.ui.graphics.lerp(colors.divider, colors.accent, position))
+                    val radius = size.height / 2 - 2.dp.toPx()
+                    val x = radius + 2.dp.toPx() + (size.width - 2 * radius - 4.dp.toPx()) * position
+                    drawCircle(androidx.compose.ui.graphics.Color.White, radius, Offset(x, size.height / 2))
+                },
+        )
+    }
+}

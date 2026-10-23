@@ -31,6 +31,8 @@ data class PlayerState(
     val isPlaying: Boolean = false,
     val durationMs: Long = 0,
     val mode: PlaybackMode = PlaybackMode.Order,
+    /** Why playback stopped, in the words of whatever failed deepest (often the plugin's own message). */
+    val error: String? = null,
 )
 
 /**
@@ -117,6 +119,9 @@ class PlayerConnection(private val context: Context) {
             isPlaying = player.isPlaying,
             durationMs = player.duration.coerceAtLeast(0),
             mode = modeOf(player),
+            error = player.playerError?.let { error ->
+                generateSequence<Throwable>(error) { it.cause }.last().message ?: error.message
+            },
         )
     }
 
@@ -134,7 +139,7 @@ class PlayerConnection(private val context: Context) {
                 .setTitle(track.title)
                 .setArtist(track.artist)
                 .setAlbumTitle(track.album)
-                .setArtworkUri(track.coverPath?.let { Uri.fromFile(File(it)) })
+                .setArtworkUri(track.coverPath?.let { if (it.startsWith("http")) Uri.parse(it) else Uri.fromFile(File(it)) })
                 .build(),
         )
         .build()

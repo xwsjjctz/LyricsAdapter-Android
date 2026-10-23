@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
 import com.lyricsadapter.app.data.AppSettings
 import com.lyricsadapter.app.data.ColorMode
@@ -54,34 +55,66 @@ enum class SettingsPage(val titleRes: Int) {
     General(R.string.settings_general),
     Focus(R.string.settings_focus),
     Cloud(R.string.settings_cloud),
+    Plugins(R.string.settings_plugins),
     About(R.string.settings_about),
 }
 
-/** Settings as a grouped list; each section opens as its own page and back returns to the list. */
+/** Where settings are open: a page, and within the plugins page one plugin and its login. */
+private data class SettingsLocation(val page: SettingsPage, val plugin: String? = null, val login: Boolean = false)
+
+/** Settings as a grouped list; each section opens as its own page and back returns one level. */
 @Composable
-fun SettingsScreen(settings: AppSettings, initialPage: SettingsPage, onClose: () -> Unit) {
+fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: () -> Unit) {
     val colors = LocalAppColors.current
-    var page by rememberSaveable { mutableStateOf(initialPage) }
-    val back = { if (page == SettingsPage.Root || page == initialPage && initialPage != SettingsPage.Root) onClose() else page = SettingsPage.Root }
+    val settings = container.settings
+    var location by remember { mutableStateOf(SettingsLocation(initialPage)) }
+    val page = location.page
+    val plugins by container.plugins.plugins.collectAsStateWithLifecycle()
+    val back = {
+        location = when {
+            location.login -> location.copy(login = false)
+            location.plugin != null -> location.copy(plugin = null)
+            page == SettingsPage.Root || page == initialPage -> {
+                onClose()
+                location
+            }
+            else -> SettingsLocation(SettingsPage.Root)
+        }
+    }
     BackHandler(onBack = back)
+    val title = when {
+        location.login -> stringResource(R.string.qr_title)
+        location.plugin != null -> plugins.firstOrNull { it.id == location.plugin }?.manifest?.name ?: stringResource(page.titleRes)
+        else -> stringResource(page.titleRes)
+    }
 
     Column(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(R.drawable.ui_arrow_back, stringResource(R.string.back), tint = colors.accent, onClick = back)
             BasicText(
-                stringResource(page.titleRes),
+                title,
                 style = TextStyle(color = colors.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(44.dp))
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
-            when (page) {
-                SettingsPage.Root -> RootPage(settings, onOpen = { page = it })
+            when {
+                location.login && location.plugin != null -> LoginPage(container, location.plugin!!, onDone = { location = location.copy(login = false) })
+                location.plugin != null -> PluginDetailPage(
+                    container,
+                    location.plugin!!,
+                    onLogin = { location = location.copy(login = true) },
+                    onRemoved = { location = location.copy(plugin = null) },
+                )
+                else -> when (page) {
+                SettingsPage.Root -> RootPage(container, onOpen = { location = SettingsLocation(it) })
                 SettingsPage.General -> GeneralPage(settings)
                 SettingsPage.Focus -> FocusPage(settings)
                 SettingsPage.Cloud -> CloudPage(settings)
+                SettingsPage.Plugins -> PluginsPage(container, onOpenPlugin = { location = location.copy(plugin = it) })
                 SettingsPage.About -> AboutPage()
+                }
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -89,8 +122,9 @@ fun SettingsScreen(settings: AppSettings, initialPage: SettingsPage, onClose: ()
 }
 
 @Composable
-private fun RootPage(settings: AppSettings, onOpen: (SettingsPage) -> Unit) {
-    val webDav by settings.webDavConfig.collectAsStateWithLifecycle()
+private fun RootPage(container: AppContainer, onOpen: (SettingsPage) -> Unit) {
+    val webDav by container.settings.webDavConfig.collectAsStateWithLifecycle()
+    val plugins by container.plugins.plugins.collectAsStateWithLifecycle()
     SettingsGroup {
         SettingsRow(stringResource(R.string.settings_general), R.drawable.ui_settings, onClick = { onOpen(SettingsPage.General) })
         RowDivider(indent = true)
@@ -101,6 +135,13 @@ private fun RootPage(settings: AppSettings, onOpen: (SettingsPage) -> Unit) {
             R.drawable.ui_cloud,
             detail = stringResource(if (webDav != null) R.string.cloud_connected else R.string.cloud_not_connected),
             onClick = { onOpen(SettingsPage.Cloud) },
+        )
+        RowDivider(indent = true)
+        SettingsRow(
+            stringResource(R.string.settings_plugins),
+            R.drawable.ui_extension,
+            detail = plugins.count { it.enabled }.takeIf { it > 0 }?.toString(),
+            onClick = { onOpen(SettingsPage.Plugins) },
         )
     }
     SettingsGroup {

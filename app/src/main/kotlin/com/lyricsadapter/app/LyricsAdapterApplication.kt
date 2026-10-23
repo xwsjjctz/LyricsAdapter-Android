@@ -10,6 +10,11 @@ import com.lyricsadapter.app.data.LibraryRepository
 import com.lyricsadapter.app.data.SecretStore
 import com.lyricsadapter.app.data.TrackReader
 import com.lyricsadapter.app.playback.PlayerConnection
+import com.lyricsadapter.app.plugins.AndroidPluginStore
+import com.lyricsadapter.app.plugins.MusicSources
+import com.lyricsadapter.app.plugins.OnlineLibrary
+import com.lyricsadapter.app.plugins.PluginCatalog
+import com.lyricsadapter.app.plugins.PluginRegistry
 import com.lyricsadapter.app.playback.SystemVolume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +27,8 @@ class LyricsAdapterApplication : Application() {
 
 /** App-wide services, created once. */
 class AppContainer(context: Context) {
-    val settings = AppSettings(context, SecretStore(context))
+    private val secrets = SecretStore(context)
+    val settings = AppSettings(context, secrets)
     private val database: LibraryDatabase = LibraryDatabase.create(context)
     /** Work that outlives any screen, such as refreshing the cloud library. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -38,6 +44,13 @@ class AppContainer(context: Context) {
         scratchDirectory = File(context.cacheDir, "cloud-heads"),
         scope = scope,
     )
+    private val pluginStore = AndroidPluginStore(context, secrets)
+    val plugins = PluginRegistry(context, File(context.filesDir, "plugins"), pluginStore).also { registry ->
+        pluginStore.onSecretsChanged = { registry.refresh() }
+    }
+    val catalog = PluginCatalog(plugins)
+    val sources = MusicSources(plugins)
+    val online = OnlineLibrary(sources, File(context.filesDir, "online-library.json"), scope)
     val player = PlayerConnection(context)
     val volume = SystemVolume(context)
 }

@@ -58,6 +58,20 @@ node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cas
 Plugins are read from the desktop's install directory `~/.la/plugin/<id>/`.
 Building the Android app needs the NDK, the Rust Android targets and cargo-ndk.
 
+## Plugins in the app
+
+`app/.../plugins/` follows desktop's registry: a `.laplugin` is JSON with
+`manifest`, `code` and the code's SHA-256, unpacked into `files/plugins/<id>/`;
+official packages come only from the catalog (`LyricsAdapter-Music-Plugins`,
+catalog v2) and must match its pinned SHA-256. Secrets use desktop's names
+(`music-plugin:<id>:secret:<name>`, the plugin reads `cookie`) inside the
+Keystore-encrypted store. Online songs play as `online:<source>:<songmid>`
+URIs that `PlaybackService` resolves through the plugin when the stream opens,
+falling back `flac → 320 → 128 → m4a` like desktop's stream protocol.
+Plugins on the newer platform API (`manifestVersion`, such as LLM translation)
+are refused for now. `./gradlew :plugin-host-spike:run --args="probe --query …"`
+lists which search results stream without a login, for manual testing.
+
 ## Cloud library
 
 The cloud slot reads the WebDAV library the way desktop's `useWebDAV` does:

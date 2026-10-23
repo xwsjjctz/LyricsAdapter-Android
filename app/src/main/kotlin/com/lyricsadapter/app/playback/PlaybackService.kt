@@ -10,7 +10,16 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import android.net.Uri
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.ResolvingDataSource
+import com.lyricsadapter.app.plugins.MusicSourceException
+import com.lyricsadapter.app.plugins.MusicSources
+import com.lyricsadapter.app.plugins.OnlineLibrary
+import com.lyricsadapter.app.plugins.parseOnlineTrackId
+import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.lyricsadapter.app.MainActivity
@@ -36,7 +45,8 @@ class PlaybackService : MediaSessionService() {
         val settings = container.settings
         // Local documents and http(s) streams; WebDAV requests get the saved account's credentials.
         val http = OkHttpClient.Builder().addInterceptor(WebDavAuthorization(settings)).build()
-        val dataSources = DefaultDataSource.Factory(this, OkHttpDataSource.Factory(http))
+        // Online songs are resolved through their plugin each time a stream opens, since the URLs expire.
+        val dataSources = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, OkHttpDataSource.Factory(http)), OnlineStreams(container.sources, container.online))
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources))
             .setAudioAttributes(
@@ -92,6 +102,31 @@ class PlaybackService : MediaSessionService() {
             val config = settings.webDavConfig.value ?: return id
             return WebDavPath.url(config.serverUrl, path).toString()
         }
+    }
+}
+
+/**
+ * Turns an `online:<source>:<songmid>` URI into the song's current stream URL
+ * and the headers its plugin asks for. Resolved URLs are reused for a while,
+ * so seeking does not ask the plugin again.
+ */
+private class OnlineStreams(private val sources: MusicSources, private val online: OnlineLibrary) : ResolvingDataSource.Resolver {
+    private val resolved = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Pair<String, Map<String, String>>>>()
+
+    override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
+        val id = dataSpec.uri.toString()
+        val (source, songmid) = parseOnlineTrackId(id) ?: return dataSpec
+        val now = System.currentTimeMillis()
+        val (url, headers) = resolved[id]?.takeIf { it.first > now }?.second ?: try {
+            runBlocking { sources.stream(source, songmid, online.find(id)?.song?.mediaMid) }
+        } catch (error: MusicSourceException) {
+            throw IOException(error.message, error)
+        }.also { resolved[id] = (now + STREAM_TTL_MS) to it }
+        return dataSpec.withUri(Uri.parse(url)).withAdditionalHeaders(headers)
+    }
+
+    private companion object {
+        const val STREAM_TTL_MS = 10 * 60 * 1000L
     }
 }
 

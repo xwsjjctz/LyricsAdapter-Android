@@ -15,6 +15,7 @@ import kotlin.system.exitProcess
  *
  *   smoke     automated checks against the live services (no login needed)
  *   qq-login  QR login for QQ Music, then search / stream / lyrics with it
+ *   probe     search --source for --query and show which results stream without a login
  */
 fun main(args: Array<String>) {
     val options = SpikeOptions.parse(args.toList())
@@ -30,8 +31,9 @@ fun main(args: Array<String>) {
         when (options.command) {
             "smoke" -> SmokeTest(loader, options).run()
             "qq-login" -> QqLogin(loader, store, options).run()
+            "probe" -> Probe(loader, options).run()
             else -> {
-                println("Unknown command: ${options.command}. Use smoke or qq-login.")
+                println("Unknown command: ${options.command}. Use smoke, qq-login or probe.")
                 false
             }
         }
@@ -44,6 +46,7 @@ class SpikeOptions(
     val pluginsDirectory: Path,
     val outputDirectory: Path,
     val query: String,
+    val source: String,
     val verbose: Boolean,
 ) {
     companion object {
@@ -54,6 +57,7 @@ class SpikeOptions(
                 pluginsDirectory = Path(value("--plugins-dir") ?: "${System.getProperty("user.home")}/.la/plugin"),
                 outputDirectory = Path(value("--out") ?: "build/spike-output"),
                 query = value("--query") ?: "晴天 周杰伦",
+                source = value("--source") ?: "netease",
                 verbose = "--verbose" in args,
             )
         }

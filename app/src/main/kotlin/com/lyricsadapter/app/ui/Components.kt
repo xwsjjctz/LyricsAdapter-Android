@@ -87,7 +87,9 @@ fun Cover(path: String?, size: Dp, modifier: Modifier = Modifier) {
     val colors = LocalAppColors.current
     Box(modifier.size(size).clip(RoundedCornerShape(6.dp)).background(colors.surface)) {
         if (path != null) {
-            AsyncImage(model = File(path), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            // Local and cloud covers are files; online covers are the source's URLs.
+            val model: Any = if (path.startsWith("http")) path else File(path)
+            AsyncImage(model = model, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
     }
 }

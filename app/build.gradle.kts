@@ -58,6 +58,7 @@ androidComponents {
 dependencies {
     implementation(project(":library"))
     implementation(project(":webdav"))
+    implementation(project(":plugin-host"))
     implementation(libs.jna) {
         artifact { type = "aar" }
     }
@@ -75,4 +76,5 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 }

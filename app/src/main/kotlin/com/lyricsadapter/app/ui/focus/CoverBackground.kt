@@ -83,7 +83,7 @@ private fun Modifier.stretched(bitmap: ImageBitmap): Modifier = drawWithCache {
 
 private suspend fun prepareBackdrop(resources: Resources, coverPath: String?, screen: IntSize, density: Float, blurRadius: Float): ImageBitmap? =
     withContext(Dispatchers.Default) {
-        val cover = coverPath?.let(BitmapFactory::decodeFile) ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        val cover = coverPath?.let(::decodeCover) ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
         cover?.let { source ->
             val pixelDp = DP_PER_PIXEL * density
             val width = ceil(screen.width / pixelDp).toInt().coerceAtLeast(1)
@@ -94,6 +94,19 @@ private suspend fun prepareBackdrop(resources: Resources, coverPath: String?, sc
             Bitmap.createBitmap(blurred.map(::tone).toIntArray(), width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
         }
     }
+
+/** A file cover, or an online one fetched over the network; null when it cannot be read. */
+private fun decodeCover(path: String): Bitmap? {
+    if (!path.startsWith("http")) return BitmapFactory.decodeFile(path)
+    return try {
+        java.net.URL(path).openConnection().apply {
+            connectTimeout = 10_000
+            readTimeout = 10_000
+        }.getInputStream().use(BitmapFactory::decodeStream)
+    } catch (_: java.io.IOException) {
+        null
+    }
+}
 
 /** The centre of [source] scaled to cover [width] x [height], as CSS `object-fit: cover`, as pixels. */
 private fun cropToFill(source: Bitmap, width: Int, height: Int): IntArray {

@@ -51,9 +51,16 @@ import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.ui.editor.MetadataEditor
 import com.lyricsadapter.app.ui.focus.FocusScreen
 import com.lyricsadapter.app.ui.palette.CommandPalette
+import com.lyricsadapter.app.plugins.MusicSourceException
+import com.lyricsadapter.app.plugins.OnlinePlaylist
+import com.lyricsadapter.app.ui.palette.OnlineResults
 import com.lyricsadapter.app.ui.palette.PaletteMode
+import com.lyricsadapter.app.ui.palette.PaletteMusic
 import com.lyricsadapter.app.ui.settings.SettingsPage
 import com.lyricsadapter.app.ui.settings.SettingsScreen
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /** Room under the list for the floating mini player. */
@@ -72,6 +79,9 @@ fun AppScreen(container: AppContainer) {
     val localTracks by library.tracks.collectAsStateWithLifecycle()
     val cloudTracks by container.cloud.tracks.collectAsStateWithLifecycle()
     val cloudStatus by container.cloud.status.collectAsStateWithLifecycle()
+    val onlineEntries by container.online.entries.collectAsStateWithLifecycle()
+    val openedPlaylist by container.online.playlist.collectAsStateWithLifecycle()
+    val plugins by container.plugins.plugins.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
     val slot by settings.activeSlot.value.collectAsStateWithLifecycle()
     val volume by container.volume.level.collectAsStateWithLifecycle(initialValue = container.volume.current())
@@ -97,13 +107,22 @@ fun AppScreen(container: AppContainer) {
     LaunchedEffect(library) { library.events.collect { notice -> context.showNotice(notice) } }
 
     val cloudList = remember(cloudTracks) { cloudTracks.map { it.toTrack() } }
+    val onlineList = remember(onlineEntries) { onlineEntries.map { it.toTrack() } }
+    val playlistList = remember(openedPlaylist) { openedPlaylist?.songs.orEmpty().map { it.toTrack() } }
     val slotTracks = when (slot) {
         SlotId.Local -> localTracks
         SlotId.Cloud -> cloudList
-        SlotId.Online, SlotId.Playlist -> emptyList()
+        SlotId.Online -> onlineList
+        SlotId.Playlist -> playlistList
     }
-    val slotCounts = mapOf(SlotId.Local to localTracks.size, SlotId.Cloud to cloudList.size, SlotId.Online to 0, SlotId.Playlist to 0)
-    val current = localTracks.firstOrNull { it.id == playerState.currentId } ?: cloudList.firstOrNull { it.id == playerState.currentId }
+    val slotCounts = mapOf(SlotId.Local to localTracks.size, SlotId.Cloud to cloudList.size, SlotId.Online to onlineList.size, SlotId.Playlist to playlistList.size)
+    val current = sequenceOf(localTracks, cloudList, onlineList, playlistList).firstNotNullOfOrNull { list -> list.firstOrNull { it.id == playerState.currentId } }
+    LaunchedEffect(playerState.error) {
+        playerState.error?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+    }
+    // Online songs get their lyrics from their source the first time they play.
+    LaunchedEffect(current?.id) { current?.id?.let(container.online::ensureLyrics) }
+    val hasSources = plugins.any { it.enabled }
     // The cloud is listed again the first time it is shown in a session, as desktop does on connecting.
     var cloudRefreshed by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(slot, cloudStatus) {
@@ -172,19 +191,25 @@ fun AppScreen(container: AppContainer) {
             actions = LibraryActions(
                 onPlay = { index -> player.play(slotTracks, index) },
                 onEdit = { track -> editingId = track.id },
-                onRemove = library::remove,
+                onRemove = { ids -> if (slot == SlotId.Online) container.online.remove(ids) else library.remove(ids) },
                 onSwitchSlot = switchSlot,
                 onSearch = { palette = PaletteMode.Library },
             ),
             empty = emptyContent(
                 slot = slot,
                 cloudStatus = cloudStatus,
+                hasSources = hasSources,
+                openPlugins = { settingsPage = SettingsPage.Plugins },
                 importFiles = importFiles,
                 openCloudSettings = { settingsPage = SettingsPage.Cloud },
                 refreshCloud = container.cloud::refresh,
                 search = { palette = PaletteMode.Library },
             ),
-            status = if (slot == SlotId.Cloud && cloudStatus == CloudStatus.Loading) stringResource(R.string.cloud_loading) else null,
+            status = when {
+                slot == SlotId.Cloud && cloudStatus == CloudStatus.Loading -> stringResource(R.string.cloud_loading)
+                slot == SlotId.Playlist && openedPlaylist != null -> openedPlaylist?.playlist?.name
+                else -> null
+            },
         )
         if (current != null) {
             MiniPlayer(
@@ -203,20 +228,43 @@ fun AppScreen(container: AppContainer) {
             val mode = palette
             if (mode != null) {
                 CommandPalette(
-                    tracks = localTracks,
+                    music = PaletteMusic(
+                        localTracks = localTracks,
+                        cloudTracks = cloudList,
+                        searchOnline = { query -> searchSources(container, query) },
+                        loadPlaylists = { loadPlaylists(container) },
+                        playTrack = { track ->
+                            val (target, list) = if (cloudList.any { it.id == track.id }) SlotId.Cloud to cloudList else SlotId.Local to localTracks
+                            switchSlot(target)
+                            player.play(list, list.indexOf(track).coerceAtLeast(0))
+                        },
+                        playOnline = { song ->
+                            // Desktop plays a search result from the online list, adding it on top.
+                            container.online.add(song)
+                            switchSlot(SlotId.Online)
+                            player.play(container.online.entries.value.map { it.toTrack() }, 0)
+                        },
+                        addOnline = container.online::add,
+                        openPlaylist = { playlist ->
+                            scope.launch {
+                                try {
+                                    container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
+                                    switchSlot(SlotId.Playlist)
+                                } catch (error: MusicSourceException) {
+                                    Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                    ),
                     commands = commands,
                     initialMode = mode,
-                    onPlayTrack = { track ->
-                        switchSlot(SlotId.Local)
-                        player.play(localTracks, localTracks.indexOf(track).coerceAtLeast(0))
-                    },
                     onClose = { palette = null },
                 )
             }
         }
         AnimatedVisibility(visible = settingsPage != null, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
             val page = settingsPage
-            if (page != null) SettingsScreen(settings, page, onClose = { settingsPage = null })
+            if (page != null) SettingsScreen(container, page, onClose = { settingsPage = null })
         }
         AnimatedVisibility(visible = editing != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
             if (editing != null) MetadataEditor(editing, onSave = { edit, done -> library.edit(editing, edit, done) }, onClose = { editingId = null })
@@ -229,6 +277,8 @@ fun AppScreen(container: AppContainer) {
 private fun emptyContent(
     slot: SlotId,
     cloudStatus: CloudStatus,
+    hasSources: Boolean,
+    openPlugins: () -> Unit,
     importFiles: () -> Unit,
     openCloudSettings: () -> Unit,
     refreshCloud: () -> Unit,
@@ -241,8 +291,37 @@ private fun emptyContent(
         CloudStatus.Idle -> EmptyContent(stringResource(R.string.cloud_empty), stringResource(R.string.cloud_refresh), refreshCloud)
         is CloudStatus.Failed -> EmptyContent(stringResource(R.string.cloud_failed, cloudStatus.message), stringResource(R.string.retry), refreshCloud)
     }
-    SlotId.Online -> EmptyContent(stringResource(R.string.empty_online), stringResource(R.string.search), search)
-    SlotId.Playlist -> EmptyContent(stringResource(R.string.empty_playlist), stringResource(R.string.search), search)
+    SlotId.Online, SlotId.Playlist -> when {
+        !hasSources -> EmptyContent(stringResource(R.string.empty_no_sources), stringResource(R.string.open_plugins), openPlugins)
+        slot == SlotId.Online -> EmptyContent(stringResource(R.string.empty_online), stringResource(R.string.search), search)
+        else -> EmptyContent(stringResource(R.string.empty_playlist), stringResource(R.string.search), search)
+    }
+}
+
+/** Every enabled music source, searched at once; a failing source reports its error under its name. */
+private suspend fun searchSources(container: AppContainer, query: String): List<OnlineResults> = coroutineScope {
+    container.plugins.sources().map { plugin ->
+        async {
+            try {
+                OnlineResults(plugin.manifest.name, container.sources.search(plugin.id, query), null)
+            } catch (error: MusicSourceException) {
+                OnlineResults(plugin.manifest.name, emptyList(), error.message)
+            }
+        }
+    }.awaitAll()
+}
+
+/** The account (or recommended) playlists of every enabled source; sources that fail are left out. */
+private suspend fun loadPlaylists(container: AppContainer): List<OnlinePlaylist> = coroutineScope {
+    container.plugins.sources().map { plugin ->
+        async {
+            try {
+                container.sources.playlists(plugin.id)
+            } catch (_: MusicSourceException) {
+                emptyList()
+            }
+        }
+    }.awaitAll().flatten()
 }
 
 private fun Context.showNotice(notice: LibraryNotice) {
