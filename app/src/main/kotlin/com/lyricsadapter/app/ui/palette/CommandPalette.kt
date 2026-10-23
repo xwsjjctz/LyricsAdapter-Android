@@ -61,6 +61,7 @@ import kotlinx.coroutines.delay
 
 /** Desktop's palette groups, in the order they are listed. */
 enum class CommandGroup(val titleRes: Int) {
+    Navigation(R.string.group_navigation),
     Library(R.string.group_library),
     Playback(R.string.group_playback),
     Appearance(R.string.group_appearance),

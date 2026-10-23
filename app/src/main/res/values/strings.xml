@@ -83,7 +83,11 @@
     <string name="palette_searching">正在搜索…</string>
     <string name="add_to_online">添加到在线列表</string>
     <string name="added_to_online">已添加到在线列表</string>
+    <string name="group_navigation">页面</string>
     <string name="group_library">曲库</string>
+    <string name="command_use_wall">切换到瀑布流</string>
+    <string name="command_use_list">切换到旧版列表</string>
+    <string name="wall_tile_label">%1$s - %2$s</string>
     <string name="group_playback">播放</string>
     <string name="group_appearance">外观</string>
     <string name="group_settings">设置</string>

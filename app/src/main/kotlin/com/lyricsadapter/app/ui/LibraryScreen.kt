@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.library.Track
 import kotlin.math.roundToInt
@@ -90,6 +91,7 @@ class EmptyContent(val message: String, val actionLabel: String?, val onAction: 
 @Composable
 fun LibraryScreen(
     slot: SlotId,
+    layout: LibraryLayout,
     tracks: List<Track>,
     slotCounts: Map<SlotId, Int>,
     currentId: String?,
@@ -115,6 +117,18 @@ fun LibraryScreen(
         Box(Modifier.weight(1f)) {
             if (tracks.isEmpty()) {
                 EmptySlot(slot, empty, Modifier.fillMaxSize())
+            } else if (layout == LibraryLayout.Wall) {
+                PosterWall(
+                    tracks = tracks,
+                    currentId = currentId,
+                    selection = selection,
+                    listState = listState,
+                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp),
+                    onClick = { index ->
+                        if (selection != null) onSelectionChange(selection.toggle(tracks[index].id)) else actions.onPlay(index)
+                    },
+                    onLongPress = { track, anchor -> if (selection == null && slot.hasTrackMenu) menu = track to anchor },
+                )
             } else {
                 LazyColumn(
                     state = listState,

@@ -29,6 +29,8 @@ class CommandDeps(
     val shuffleAll: () -> Unit,
     val toggleColorMode: () -> Unit,
     val openSettings: (SettingsPage) -> Unit,
+    val wall: Boolean,
+    val toggleLayout: () -> Unit,
     /** Null while no WebDAV library is connected. */
     val refreshCloud: (() -> Unit)?,
 )
@@ -61,6 +63,14 @@ fun appCommands(deps: CommandDeps): List<PaletteCommand> {
         },
     )
     return buildList {
+        add(
+            PaletteCommand(
+                "navigation.layout", CommandGroup.Navigation,
+                stringResource(if (deps.wall) R.string.command_use_list else R.string.command_use_wall),
+                if (deps.wall) R.drawable.ui_view_list else R.drawable.ui_auto_awesome_mosaic,
+                keywords = listOf("wall", "list", "layout"), run = deps.toggleLayout,
+            ),
+        )
         addAll(sources)
         deps.refreshCloud?.let { refresh ->
             add(PaletteCommand("library.refreshCloud", CommandGroup.Library, stringResource(R.string.cloud_refresh), R.drawable.ui_sync, keywords = listOf("webdav", "cloud"), run = refresh))

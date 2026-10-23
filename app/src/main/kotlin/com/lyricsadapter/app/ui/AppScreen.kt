@@ -47,6 +47,7 @@ import com.lyricsadapter.app.data.CloudStatus
 import com.lyricsadapter.app.data.ColorMode
 import com.lyricsadapter.app.data.EditResult
 import com.lyricsadapter.app.data.FocusSettings
+import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.ui.editor.MetadataEditor
 import com.lyricsadapter.app.ui.focus.FocusScreen
@@ -84,6 +85,7 @@ fun AppScreen(container: AppContainer) {
     val plugins by container.plugins.plugins.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
     val slot by settings.activeSlot.value.collectAsStateWithLifecycle()
+    val layout by settings.libraryLayout.value.collectAsStateWithLifecycle()
     val volume by container.volume.level.collectAsStateWithLifecycle(initialValue = container.volume.current())
     val colors = LocalAppColors.current
     val context = LocalContext.current
@@ -158,7 +160,8 @@ fun AppScreen(container: AppContainer) {
             locateCurrent = {
                 switchSlot(SlotId.Local)
                 val index = localTracks.indexOf(current)
-                if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+                val item = if (layout == LibraryLayout.Wall) wallBlockOf(index, localTracks.size) else index
+                if (index >= 0) scope.launch { listState.animateScrollToItem(item) }
             },
             openFocus = { focusOpen = true },
             cyclePlaybackMode = player::cyclePlaybackMode,
@@ -167,6 +170,8 @@ fun AppScreen(container: AppContainer) {
             shuffleAll = { player.playShuffled(slotTracks) },
             toggleColorMode = { settings.colorMode.set(if (colors.isDark) ColorMode.Light else ColorMode.Dark) },
             openSettings = { settingsPage = it },
+            wall = layout == LibraryLayout.Wall,
+            toggleLayout = { settings.libraryLayout.set(if (layout == LibraryLayout.Wall) LibraryLayout.List else LibraryLayout.Wall) },
             refreshCloud = if (cloudStatus != CloudStatus.NotConnected) container.cloud::refresh else null,
         ),
     )
@@ -176,6 +181,7 @@ fun AppScreen(container: AppContainer) {
         val direction = LocalLayoutDirection.current
         LibraryScreen(
             slot = slot,
+            layout = layout,
             tracks = slotTracks,
             slotCounts = slotCounts,
             currentId = playerState.currentId,

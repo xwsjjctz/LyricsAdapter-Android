@@ -16,6 +16,9 @@ enum class ColorMode { System, Light, Dark }
  */
 enum class SlotId { Local, Cloud, Online, Playlist }
 
+/** Desktop's `libraryMode`: the poster wall (the default) or the classic list. */
+enum class LibraryLayout { Wall, List }
+
 /** One stored choice, readable as a flow. */
 class Setting<T> internal constructor(
     private val prefs: SharedPreferences,
@@ -53,6 +56,7 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
 
     val colorMode: Setting<ColorMode> = enumSetting("colorMode", ColorMode.System)
     val activeSlot: Setting<SlotId> = enumSetting("activeSlot", SlotId.Local)
+    val libraryLayout: Setting<LibraryLayout> = enumSetting("libraryMode", LibraryLayout.Wall)
 
     val focusBackgroundBlur = RangeSetting(prefs, "focusBgBlurRadius", 40..80, 80)
     val focusFontSize = RangeSetting(prefs, "focusLyricsFontSize", 24..40, 32)
