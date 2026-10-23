@@ -69,6 +69,15 @@ class PlayerConnection(private val context: Context) {
         player.play()
     }
 
+    /** Plays [tracks] in random order, starting from a random one, and leaves shuffle on. */
+    fun playShuffled(tracks: List<Track>) {
+        val player = controller ?: return
+        if (tracks.isEmpty()) return
+        if (player.repeatMode == Player.REPEAT_MODE_ONE) player.repeatMode = Player.REPEAT_MODE_ALL
+        player.shuffleModeEnabled = true
+        play(tracks, tracks.indices.random())
+    }
+
     fun togglePlay() {
         val player = controller ?: return
         if (player.isPlaying) player.pause() else player.play()

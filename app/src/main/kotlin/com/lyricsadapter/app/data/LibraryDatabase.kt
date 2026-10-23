@@ -72,6 +72,9 @@ interface TrackDao {
 
     @Query("DELETE FROM tracks WHERE id IN (:ids)")
     suspend fun delete(ids: List<String>)
+
+    @Query("SELECT DISTINCT coverPath FROM tracks WHERE coverPath IS NOT NULL")
+    suspend fun coverPaths(): List<String>
 }
 
 data class TrackPosition(val id: String, val position: Int)

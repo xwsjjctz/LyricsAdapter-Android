@@ -1,13 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Wording follows the desktop app's zh.json where the same thing exists there. -->
 <resources>
     <string name="app_name">LyricsAdapter</string>
-    <string name="library_title">本地</string>
-    <string name="library_summary">%1$d 首歌曲 · %2$s</string>
-    <string name="library_empty">把手机里的 MP3、FLAC 导入进来</string>
+
+    <!-- Library slots -->
+    <string name="slot_local">本地</string>
+    <string name="slot_cloud">云端</string>
+    <string name="slot_online">在线播放记录</string>
+    <string name="slot_playlist">歌单</string>
+    <string name="switch_slot">切换歌单</string>
+    <plurals name="library_summary">
+        <item quantity="other">%1$d 首歌曲 · %2$s</item>
+    </plurals>
+    <string name="empty_local">把手机里的 MP3、FLAC 导入进来</string>
+    <string name="empty_cloud">连接 WebDAV 后，云端曲库会显示在这里</string>
+    <string name="empty_online">在搜索里播放或添加的在线歌曲会出现在这里</string>
+    <string name="empty_playlist">登录音乐源后，可以在搜索里打开歌单</string>
+    <string name="open_settings">打开设置</string>
+
+    <!-- Library actions -->
     <string name="import_files">导入文件</string>
-    <string name="import_done">已导入 %1$d 首</string>
-    <string name="import_failed">%1$d 个文件无法读取</string>
+    <plurals name="import_done">
+        <item quantity="other">已导入 %d 首</item>
+    </plurals>
+    <plurals name="import_failed">
+        <item quantity="other">%d 个文件无法读取</item>
+    </plurals>
+    <string name="song_actions">歌曲操作</string>
+    <string name="edit_info">编辑歌曲信息</string>
+    <string name="select_multiple">选择多首歌曲</string>
+    <string name="select_all">全选</string>
+    <string name="select_none">全不选</string>
+    <plurals name="selected_count">
+        <item quantity="other">已选择 %d 首</item>
+    </plurals>
+    <string name="remove_from_library">从曲库移除</string>
+    <string name="remove_confirm_title">从曲库移除？</string>
+    <string name="remove_confirm_message">歌曲将从曲库中移除，原音频文件会保留。</string>
+    <plurals name="removed_count">
+        <item quantity="other">已移除 %d 首</item>
+    </plurals>
     <string name="unknown_artist">未知艺术家</string>
+
+    <!-- Common -->
+    <string name="search">搜索</string>
+    <string name="cancel">取消</string>
+    <string name="done">完成</string>
+    <string name="save">保存</string>
+    <string name="saving">正在保存…</string>
+    <string name="remove">移除</string>
+
+    <!-- Metadata editor -->
+    <string name="metadata_title">元数据</string>
+    <string name="import_cover">导入封面</string>
+    <string name="field_title">标题</string>
+    <string name="field_artist">艺术家</string>
+    <string name="field_album">专辑</string>
+    <string name="field_lyrics">歌词</string>
+    <string name="edited">已修改</string>
+    <string name="lyrics_placeholder">粘贴纯文本或 LRC 格式的歌词</string>
+    <string name="word_lyrics_hint">正在编辑逐字歌词原文，请保留行和字的时间标记。保存后写入文件，专注模式立即生效。</string>
+    <string name="word_lyrics_invalid">逐字歌词解析失败，请检查行和字的时间标记后再保存。</string>
+    <string name="edit_no_write_access">没有写入这个文件的权限。请重新导入这首歌后再编辑。</string>
+    <string name="edit_failed">保存失败</string>
+    <string name="metadata_saved">元数据已保存</string>
+    <string name="metadata_saved_without_word_lyrics">已保存，但这种格式无法写入逐字歌词</string>
+
+    <!-- Command palette -->
+    <string name="palette_mode_library">音乐库</string>
+    <string name="palette_mode_commands">功能</string>
+    <string name="palette_placeholder_library">搜索歌曲、歌手、专辑或歌单</string>
+    <string name="palette_placeholder_commands">搜索功能</string>
+    <string name="palette_library_hint">输入歌名、歌手或专辑，支持拼音和首字母</string>
+    <string name="palette_no_results">没有找到</string>
+    <string name="group_library">曲库</string>
+    <string name="group_playback">播放</string>
+    <string name="group_appearance">外观</string>
+    <string name="group_settings">设置</string>
+    <string name="command_switch_source">切换到%1$s</string>
+    <string name="command_play_all">播放全部</string>
+    <string name="command_shuffle_all">随机播放全部</string>
+    <string name="command_locate">定位到当前播放</string>
+    <string name="command_focus_mode">进入专注模式</string>
+    <string name="command_playback_mode">切换播放顺序</string>
+    <string name="command_mute">静音切换</string>
+    <string name="command_color_mode">黑白切换</string>
+    <string name="command_state_on">开</string>
+    <string name="command_state_off">关</string>
+    <string name="state_dark">深色</string>
+    <string name="state_light">浅色</string>
+
+    <!-- Playback -->
     <string name="no_lyrics">暂无歌词</string>
     <string name="action_play">播放</string>
     <string name="action_pause">暂停</string>
