@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.data.FocusSettings
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lyricsadapter.app.playback.PlayerConnection
 import com.lyricsadapter.app.playback.PlayerState
@@ -66,7 +67,14 @@ private const val CONTROLS_FADE_MS = 200
  * down or tapping the grabber closes it.
  */
 @Composable
-fun FocusScreen(track: Track, playback: PlayerState, player: PlayerConnection, volume: SystemVolume, onClose: () -> Unit) {
+fun FocusScreen(
+    track: Track,
+    playback: PlayerState,
+    player: PlayerConnection,
+    volume: SystemVolume,
+    settings: FocusSettings,
+    onClose: () -> Unit,
+) {
     val lyrics = remember(track.id) { track.parsedLyrics() }
     val clock = rememberFocusClock(player, playback.isPlaying, track.id)
     val volumeLevel by volume.level.collectAsStateWithLifecycle(initialValue = volume.current())
@@ -80,7 +88,7 @@ fun FocusScreen(track: Track, playback: PlayerState, player: PlayerConnection, v
     val seek: (Long) -> Unit = player::seekTo
 
     Box(Modifier.fillMaxSize().graphicsLayer { translationY = dismiss }) {
-        CoverBackground(track.coverPath, modifier = Modifier.fillMaxSize())
+        CoverBackground(track.coverPath, blurRadius = settings.backgroundBlur, modifier = Modifier.fillMaxSize())
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Header(
                 track = track,
@@ -105,6 +113,7 @@ fun FocusScreen(track: Track, playback: PlayerState, player: PlayerConnection, v
                         modifier = Modifier.fillMaxSize(),
                         controlsHeight = CONTROLS_SPACE,
                         controlsShown = { controlsAlpha },
+                        settings = settings,
                     )
                     lyrics.plainText.isNotEmpty() -> BasicText(
                         lyrics.plainText,

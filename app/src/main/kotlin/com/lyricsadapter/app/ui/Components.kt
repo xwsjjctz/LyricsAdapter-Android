@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,6 +39,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -136,6 +140,8 @@ fun LabeledField(
     trailingLabel: String? = null,
     minHeight: Dp = 0.dp,
     monospace: Boolean = false,
+    password: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
     val colors = LocalAppColors.current
     Column(modifier.fillMaxWidth()) {
@@ -157,6 +163,12 @@ fun LabeledField(
                 lineHeight = if (monospace) 20.sp else TextStyle.Default.lineHeight,
             ),
             cursorBrush = SolidColor(colors.accent),
+            visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = when {
+                password -> KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)
+                keyboardType != KeyboardType.Text -> KeyboardOptions(keyboardType = keyboardType, autoCorrectEnabled = false)
+                else -> KeyboardOptions.Default
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))

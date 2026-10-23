@@ -37,11 +37,10 @@ import kotlin.math.sqrt
 
 /*
  * Desktop's classic FocusMode backdrop (`FocusCanvasBackdrop.tsx`, `FocusBackdrop.tsx`
- * in the desktop repository) with its default settings: the cover cropped to
- * fill the screen, blurred by 80 px with clamped edges, saturated 1.5x and
+ * in the desktop repository): the cover cropped to fill the screen, blurred
+ * by the background-blur setting (80 px by default) with clamped edges, saturated 1.5x and
  * dimmed to 0.55, under a black gradient for readability.
  */
-private const val BLUR_RADIUS_DP = 80f
 private const val SATURATION = 1.5f
 private const val BRIGHTNESS = 0.55f
 private const val CROSSFADE_MS = 1000
@@ -62,12 +61,12 @@ private val PLACEHOLDER = Color(0xFF1C1C1E)
 
 /** The track's cover, blurred and dimmed behind the lyrics; the app icon stands in when there is none. */
 @Composable
-fun CoverBackground(coverPath: String?, modifier: Modifier = Modifier) {
+fun CoverBackground(coverPath: String?, blurRadius: Int, modifier: Modifier = Modifier) {
     val resources = LocalContext.current.resources
     val density = LocalDensity.current.density
     var size by remember { mutableStateOf(IntSize.Zero) }
-    val backdrop by produceState<ImageBitmap?>(null, coverPath, size) {
-        if (size.width > 0 && size.height > 0) value = prepareBackdrop(resources, coverPath, size, density)
+    val backdrop by produceState<ImageBitmap?>(null, coverPath, size, blurRadius) {
+        if (size.width > 0 && size.height > 0) value = prepareBackdrop(resources, coverPath, size, density, blurRadius.toFloat())
     }
     Box(modifier.onSizeChanged { size = it }.background(PLACEHOLDER)) {
         Crossfade(backdrop, animationSpec = tween(CROSSFADE_MS), label = "backdrop") { bitmap ->
@@ -82,7 +81,7 @@ private fun Modifier.stretched(bitmap: ImageBitmap): Modifier = drawWithCache {
     onDrawBehind { drawImage(bitmap, dstSize = target, filterQuality = FilterQuality.Low) }
 }
 
-private suspend fun prepareBackdrop(resources: Resources, coverPath: String?, screen: IntSize, density: Float): ImageBitmap? =
+private suspend fun prepareBackdrop(resources: Resources, coverPath: String?, screen: IntSize, density: Float, blurRadius: Float): ImageBitmap? =
     withContext(Dispatchers.Default) {
         val cover = coverPath?.let(BitmapFactory::decodeFile) ?: BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
         cover?.let { source ->
@@ -91,7 +90,7 @@ private suspend fun prepareBackdrop(resources: Resources, coverPath: String?, sc
             val height = ceil(screen.height / pixelDp).toInt().coerceAtLeast(1)
             val cropped = cropToFill(source, width, height)
             source.recycle()
-            val blurred = gaussianBlur(cropped, width, height, sigma = BLUR_RADIUS_DP / DP_PER_PIXEL)
+            val blurred = gaussianBlur(cropped, width, height, sigma = blurRadius / DP_PER_PIXEL)
             Bitmap.createBitmap(blurred.map(::tone).toIntArray(), width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
         }
     }

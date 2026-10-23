@@ -7,6 +7,7 @@ import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.playback.PlaybackMode
 import com.lyricsadapter.app.ui.palette.CommandGroup
 import com.lyricsadapter.app.ui.palette.PaletteCommand
+import com.lyricsadapter.app.ui.settings.SettingsPage
 
 /** What the commands read and do; the screen supplies it. */
 class CommandDeps(
@@ -27,6 +28,7 @@ class CommandDeps(
     val playAll: () -> Unit,
     val shuffleAll: () -> Unit,
     val toggleColorMode: () -> Unit,
+    val openSettings: (SettingsPage) -> Unit,
 )
 
 /**
@@ -83,5 +85,16 @@ fun appCommands(deps: CommandDeps): List<PaletteCommand> {
                 keywords = listOf("dark", "light", "theme"), run = deps.toggleColorMode,
             ),
         )
+        val settingsTitle = stringResource(R.string.settings_title)
+        add(PaletteCommand("settings.open", CommandGroup.Settings, settingsTitle, R.drawable.ui_settings, keywords = listOf("settings")) { deps.openSettings(SettingsPage.Root) })
+        listOf(
+            Triple(SettingsPage.General, R.drawable.ui_settings, "general"),
+            Triple(SettingsPage.Focus, R.drawable.ui_tune, "focus"),
+            Triple(SettingsPage.Cloud, R.drawable.ui_cloud, "webdav cloud"),
+        ).forEach { (page, icon, keyword) ->
+            val title = "$settingsTitle › ${stringResource(page.titleRes)}"
+            add(PaletteCommand("settings.${page.name.lowercase()}", CommandGroup.Settings, title, icon, keywords = listOf(keyword)) { deps.openSettings(page) })
+        }
+        add(PaletteCommand("settings.about", CommandGroup.Settings, stringResource(R.string.settings_about), R.drawable.ui_info, keywords = listOf("about")) { deps.openSettings(SettingsPage.About) })
     }
 }

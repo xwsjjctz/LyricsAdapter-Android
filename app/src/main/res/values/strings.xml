@@ -90,6 +90,39 @@
     <string name="state_dark">深色</string>
     <string name="state_light">浅色</string>
 
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_general">通用</string>
+    <string name="settings_focus">专注模式</string>
+    <string name="settings_cloud">云端曲库</string>
+    <string name="settings_about">关于</string>
+    <string name="back">返回</string>
+    <string name="cloud_connected">已连接</string>
+    <string name="cloud_not_connected">未连接</string>
+    <string name="settings_appearance">外观</string>
+    <string name="appearance_system">跟随系统</string>
+    <string name="focus_background">背景</string>
+    <string name="focus_background_blur">背景模糊</string>
+    <string name="focus_lyrics">滚动歌词</string>
+    <string name="focus_font_size">字号</string>
+    <string name="focus_line_spacing">行间距</string>
+    <string name="focus_inactive_blur">非当前行模糊</string>
+    <string name="focus_lyrics_footer">与桌面版同名的设置，取值范围也相同。</string>
+    <string name="webdav_url">服务器地址</string>
+    <string name="webdav_username">账号</string>
+    <string name="webdav_password">应用密码</string>
+    <string name="webdav_test_and_save">测试并保存</string>
+    <string name="webdav_testing">测试中…</string>
+    <string name="webdav_connected_saved">连接成功，已保存</string>
+    <string name="webdav_fill_all">请填写所有 WebDAV 配置项</string>
+    <string name="webdav_invalid_url">服务器地址无效，请以 http:// 或 https:// 开头</string>
+    <string name="webdav_footer">云端曲库与桌面版共用同一个 WebDAV 目录和 meta.json。部分网盘需要先在网页端生成应用密码。</string>
+    <string name="webdav_disconnect">断开连接</string>
+    <string name="about_version">版本 %1$s</string>
+    <string name="about_desktop">桌面版 LyricsAdapter</string>
+    <string name="about_licenses">开源许可</string>
+    <string name="command_open_settings">打开设置</string>
+
     <!-- Playback -->
     <string name="no_lyrics">暂无歌词</string>
     <string name="action_play">播放</string>

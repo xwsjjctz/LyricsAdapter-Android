@@ -57,6 +57,7 @@ androidComponents {
 
 dependencies {
     implementation(project(":library"))
+    implementation(project(":webdav"))
     implementation(libs.jna) {
         artifact { type = "aar" }
     }

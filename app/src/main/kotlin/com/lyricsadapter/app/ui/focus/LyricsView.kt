@@ -47,13 +47,21 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lyricsadapter.app.data.FocusSettings
 import com.lyricsadapter.lyrics.LyricLine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-private val LINE_STYLE = TextStyle(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, color = UNSUNG)
+/** Desktop's line height for scrolling lyrics, relative to the font size. */
+private const val LINE_HEIGHT = 1.25f
+
+/** How much blur each line of distance from the sung one adds, per pixel of the inactive-blur setting. */
+private const val BLUR_PER_LINE = 0.55f
+
+private fun lineStyle(fontSize: Int) =
+    TextStyle(fontSize = fontSize.sp, lineHeight = (fontSize * LINE_HEIGHT).sp, fontWeight = FontWeight.Bold, color = UNSUNG)
 
 /** After a manual scroll, how long the lyrics wait before following the song again. */
 private const val BROWSE_HOLD_MS = 3_000L
@@ -76,8 +84,12 @@ fun LyricsView(
     modifier: Modifier = Modifier,
     controlsHeight: Dp = 0.dp,
     controlsShown: () -> Float = { 0f },
+    settings: FocusSettings = FocusSettings(),
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
+    val style = remember(settings.fontSize) { lineStyle(settings.fontSize) }
+    val gap = (settings.lineSpacing / 2f).dp
+    val blurStep = settings.inactiveBlur * BLUR_PER_LINE
     val active by remember(items) { derivedStateOf { items.activeItemAt(position()) } }
     val scroller = remember(items) { LyricsScroller() }
     val measurer = rememberTextMeasurer()
@@ -136,6 +148,9 @@ fun LyricsView(
                             browsing = browsing,
                             position = position,
                             measurer = measurer,
+                            style = style,
+                            gap = gap,
+                            blurStep = blurStep,
                             onClick = {
                                 onLineClick(item.line)
                                 followSong(after = 0)
@@ -179,23 +194,26 @@ private fun LyricLineText(
     browsing: Boolean,
     position: () -> Long,
     measurer: TextMeasurer,
+    style: TextStyle,
+    gap: Dp,
+    blurStep: Float,
     onClick: () -> Unit,
 ) {
     val active = distance == 0f
     val emphasis by animateFloatAsState(if (active) 1f else 0f, spring(dampingRatio = 1f, stiffness = 160f), label = "emphasis")
-    val blurTarget = if (browsing || active) 0f else abs(distance).coerceAtMost(6f) * 1.1f
+    val blurTarget = if (browsing || active) 0f else abs(distance).coerceAtMost(6f) * blurStep
     val blur by animateFloatAsState(blurTarget, spring(stiffness = 120f), label = "blur")
     val glowLayer = rememberGraphicsLayer()
-    val painter = remember(line, measurer, glowLayer) { SungLinePainter(line, measurer, LINE_STYLE, glowLayer) }
+    val painter = remember(line, measurer, glowLayer, style) { SungLinePainter(line, measurer, style, glowLayer) }
 
     BasicText(
         text = line.text,
-        style = LINE_STYLE,
+        style = style,
         onTextLayout = painter::onLayout,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = 28.dp, vertical = 12.dp)
+            .padding(horizontal = 28.dp, vertical = gap)
             .graphicsLayer {
                 val scale = 0.97f + 0.03f * emphasis
                 scaleX = scale

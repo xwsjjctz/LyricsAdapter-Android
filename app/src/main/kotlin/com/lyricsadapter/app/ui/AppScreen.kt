@@ -9,7 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,11 +44,14 @@ import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
 import com.lyricsadapter.app.data.ColorMode
 import com.lyricsadapter.app.data.EditResult
+import com.lyricsadapter.app.data.FocusSettings
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.ui.editor.MetadataEditor
 import com.lyricsadapter.app.ui.focus.FocusScreen
 import com.lyricsadapter.app.ui.palette.CommandPalette
 import com.lyricsadapter.app.ui.palette.PaletteMode
+import com.lyricsadapter.app.ui.settings.SettingsPage
+import com.lyricsadapter.app.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
 /** Room under the list for the floating mini player. */
@@ -74,6 +79,13 @@ fun AppScreen(container: AppContainer) {
     var focusOpen by rememberSaveable { mutableStateOf(false) }
     var palette by rememberSaveable { mutableStateOf<PaletteMode?>(null) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var settingsPage by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    val focusSettings = FocusSettings(
+        backgroundBlur = settings.focusBackgroundBlur.value.collectAsStateWithLifecycle().value,
+        fontSize = settings.focusFontSize.value.collectAsStateWithLifecycle().value,
+        lineSpacing = settings.focusLineSpacing.value.collectAsStateWithLifecycle().value,
+        inactiveBlur = settings.focusInactiveBlur.value.collectAsStateWithLifecycle().value,
+    )
     var selection by remember { mutableStateOf<Set<String>?>(null) }
 
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> library.import(uris) }
@@ -118,6 +130,7 @@ fun AppScreen(container: AppContainer) {
             playAll = { player.play(slotTracks, 0) },
             shuffleAll = { player.playShuffled(slotTracks) },
             toggleColorMode = { settings.colorMode.set(if (colors.isDark) ColorMode.Light else ColorMode.Dark) },
+            openSettings = { settingsPage = it },
         ),
     )
 
@@ -147,8 +160,7 @@ fun AppScreen(container: AppContainer) {
                 onEmptyAction = {
                     when (slot) {
                         SlotId.Local -> importFiles()
-                        // Settings arrive with the next page; until then the palette lists what there is.
-                        SlotId.Cloud -> palette = PaletteMode.Commands
+                        SlotId.Cloud -> settingsPage = SettingsPage.Cloud
                         SlotId.Online, SlotId.Playlist -> palette = PaletteMode.Library
                     }
                 },
@@ -165,7 +177,7 @@ fun AppScreen(container: AppContainer) {
             )
         }
         AnimatedVisibility(visible = focusOpen && current != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-            if (current != null) FocusScreen(current, playerState, player, container.volume, onClose = { focusOpen = false })
+            if (current != null) FocusScreen(current, playerState, player, container.volume, focusSettings, onClose = { focusOpen = false })
         }
         AnimatedVisibility(visible = palette != null, enter = fadeIn(), exit = fadeOut()) {
             val mode = palette
@@ -181,6 +193,10 @@ fun AppScreen(container: AppContainer) {
                     onClose = { palette = null },
                 )
             }
+        }
+        AnimatedVisibility(visible = settingsPage != null, enter = slideInHorizontally { it }, exit = slideOutHorizontally { it }) {
+            val page = settingsPage
+            if (page != null) SettingsScreen(settings, page, onClose = { settingsPage = null })
         }
         AnimatedVisibility(visible = editing != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
             if (editing != null) MetadataEditor(editing, onSave = { edit, done -> library.edit(editing, edit, done) }, onClose = { editingId = null })

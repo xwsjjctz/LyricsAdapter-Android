@@ -5,6 +5,7 @@ import android.content.Context
 import com.lyricsadapter.app.data.AppSettings
 import com.lyricsadapter.app.data.LibraryDatabase
 import com.lyricsadapter.app.data.LibraryRepository
+import com.lyricsadapter.app.data.SecretStore
 import com.lyricsadapter.app.data.TrackReader
 import com.lyricsadapter.app.playback.PlayerConnection
 import com.lyricsadapter.app.playback.SystemVolume
@@ -16,7 +17,7 @@ class LyricsAdapterApplication : Application() {
 
 /** App-wide services, created once. */
 class AppContainer(context: Context) {
-    val settings = AppSettings(context)
+    val settings = AppSettings(context, SecretStore(context))
     private val database: LibraryDatabase = LibraryDatabase.create(context)
     val library = LibraryRepository(
         resolver = context.contentResolver,
