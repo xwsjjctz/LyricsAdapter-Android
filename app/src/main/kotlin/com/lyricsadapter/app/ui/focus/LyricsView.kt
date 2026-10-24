@@ -188,7 +188,7 @@ fun LyricsView(
                                 followSong(after = 0)
                             },
                         )
-                        is InterludeItem -> InterludeDots(item, active = index == active, position = position)
+                        is InterludeItem -> InterludeDots(item, active = index == active, position = position, fontSize = settings.fontSize.toFloat(), linePadding = LINE_PADDING)
                     }
                 }
             }
