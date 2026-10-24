@@ -112,6 +112,9 @@
     <string name="settings_appearance">Darstellung</string>
     <string name="appearance_system">Wie System</string>
     <string name="focus_background">Hintergrund</string>
+    <string name="focus_flowing_background">Fließender Hintergrund</string>
+    <string name="focus_flowing_background_description">Einen fließenden Farbverlauf im Stil von Apple Music verwenden, der im Takt pulsiert. Ausschalten stellt das ursprüngliche unscharfe Cover wieder her.</string>
+    <string name="focus_flowing_background_unsupported">Der fließende Hintergrund braucht Android 13 oder neuer.</string>
     <string name="focus_background_blur">Hintergrundunschärfe</string>
     <string name="focus_lyrics">Scrollender Songtext</string>
     <string name="focus_font_size">Schriftgröße</string>

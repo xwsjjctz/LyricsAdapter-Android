@@ -166,7 +166,11 @@ fun FocusScreen(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().graphicsLayer { translationY = dismiss }) {
-        CoverBackground(track.coverPath, blurRadius = settings.backgroundBlur, modifier = Modifier.fillMaxSize())
+        if (settings.flowingBackground && flowingBackgroundSupported) {
+            FlowingBackground(track.coverPath, playback.isPlaying, Modifier.fillMaxSize())
+        } else {
+            CoverBackground(track.coverPath, blurRadius = settings.backgroundBlur, modifier = Modifier.fillMaxSize())
+        }
         if (maxWidth > maxHeight) {
             Row(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Box(Modifier.weight(LANDSCAPE_ARTWORK_WEIGHT).fillMaxHeight()) {

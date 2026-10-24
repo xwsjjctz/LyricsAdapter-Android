@@ -112,6 +112,9 @@
     <string name="settings_appearance">Appearance</string>
     <string name="appearance_system">Match System</string>
     <string name="focus_background">Background</string>
+    <string name="focus_flowing_background">Flowing Background</string>
+    <string name="focus_flowing_background_description">Use an Apple Music–style flowing gradient that pulses with the beat. Turn off to use the original blurred cover.</string>
+    <string name="focus_flowing_background_unsupported">The flowing background needs Android 13 or later.</string>
     <string name="focus_background_blur">Background Blur</string>
     <string name="focus_lyrics">Scrolling Lyrics</string>
     <string name="focus_font_size">Font Size</string>

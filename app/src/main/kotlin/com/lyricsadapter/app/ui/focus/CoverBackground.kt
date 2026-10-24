@@ -96,7 +96,7 @@ private suspend fun prepareBackdrop(resources: Resources, coverPath: String?, sc
     }
 
 /** A file cover, or an online one fetched over the network; null when it cannot be read. */
-private fun decodeCover(path: String): Bitmap? {
+internal fun decodeCover(path: String): Bitmap? {
     if (!path.startsWith("http")) return BitmapFactory.decodeFile(path)
     return try {
         java.net.URL(path).openConnection().apply {

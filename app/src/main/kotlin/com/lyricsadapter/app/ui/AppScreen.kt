@@ -109,6 +109,7 @@ fun AppScreen(container: AppContainer) {
         fontSize = settings.focusFontSize.value.collectAsStateWithLifecycle().value,
         lineSpacing = settings.focusLineSpacing.value.collectAsStateWithLifecycle().value,
         inactiveBlur = settings.focusInactiveBlur.value.collectAsStateWithLifecycle().value,
+        flowingBackground = settings.focusFlowingBackground.value.collectAsStateWithLifecycle().value,
     )
     var selection by remember { mutableStateOf<Set<String>?>(null) }
 

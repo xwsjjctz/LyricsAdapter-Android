@@ -107,6 +107,9 @@
     <string name="settings_appearance">모양</string>
     <string name="appearance_system">시스템 설정 따르기</string>
     <string name="focus_background">배경</string>
+    <string name="focus_flowing_background">흐르는 배경</string>
+    <string name="focus_flowing_background_description">Apple Music 스타일의 흐르는 그라데이션 배경을 사용하고 비트에 맞춰 움직입니다. 끄면 기존의 흐린 커버 배경으로 돌아갑니다.</string>
+    <string name="focus_flowing_background_unsupported">흐르는 배경은 Android 13 이상이 필요합니다.</string>
     <string name="focus_background_blur">배경 흐림</string>
     <string name="focus_lyrics">스크롤 가사</string>
     <string name="focus_font_size">글자 크기</string>

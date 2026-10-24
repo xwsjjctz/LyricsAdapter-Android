@@ -213,6 +213,10 @@ STRINGS = {
     ],
     "plugin_secret_empty": ["Not set", "未設定", "설정 안 됨", "Nicht festgelegt", "Non défini"],
     "plugin_kind_translation": ["Lyrics translation", "歌詞の翻訳", "가사 번역", "Songtext-Übersetzung", "Traduction des paroles"],
+    "focus_flowing_background_unsupported": [
+        "The flowing background needs Android 13 or later.", "動的な流れる背景には Android 13 以降が必要です。", "흐르는 배경은 Android 13 이상이 필요합니다.",
+        "Der fließende Hintergrund braucht Android 13 oder neuer.", "Le fond animé nécessite Android 13 ou une version ultérieure.",
+    ],
     "track_download": ["Download", "ダウンロード", "다운로드", "Herunterladen", "Télécharger"],
 }
 

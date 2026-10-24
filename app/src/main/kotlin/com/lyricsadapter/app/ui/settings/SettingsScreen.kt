@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
 import com.lyricsadapter.app.data.AppLanguage
+import com.lyricsadapter.app.ui.focus.flowingBackgroundSupported
 import com.lyricsadapter.app.data.AppSettings
 import com.lyricsadapter.app.data.ColorMode
 import com.lyricsadapter.app.ui.IconButton
@@ -190,7 +191,15 @@ private fun FocusPage(settings: AppSettings) {
     val fontSize by settings.focusFontSize.value.collectAsStateWithLifecycle()
     val spacing by settings.focusLineSpacing.value.collectAsStateWithLifecycle()
     val inactiveBlur by settings.focusInactiveBlur.value.collectAsStateWithLifecycle()
-    SettingsGroup(title = stringResource(R.string.focus_background)) {
+    val flowing by settings.focusFlowingBackground.value.collectAsStateWithLifecycle()
+    SettingsGroup(
+        title = stringResource(R.string.focus_background),
+        footer = stringResource(if (flowingBackgroundSupported) R.string.focus_flowing_background_description else R.string.focus_flowing_background_unsupported),
+    ) {
+        if (flowingBackgroundSupported) {
+            SwitchRow(stringResource(R.string.focus_flowing_background), flowing, settings.focusFlowingBackground::set)
+            RowDivider()
+        }
         SliderRow(stringResource(R.string.focus_background_blur), blur, settings.focusBackgroundBlur.range, "px", settings.focusBackgroundBlur::set)
     }
     SettingsGroup(title = stringResource(R.string.focus_lyrics), footer = stringResource(R.string.focus_lyrics_footer)) {

@@ -121,6 +121,9 @@
     <string name="settings_appearance">外观</string>
     <string name="appearance_system">跟随系统</string>
     <string name="focus_background">背景</string>
+    <string name="focus_flowing_background">动态流光背景</string>
+    <string name="focus_flowing_background_description">使用 Apple Music 风格的流动渐变背景，并随音乐鼓点律动；关闭则使用原有的模糊封面背景。</string>
+    <string name="focus_flowing_background_unsupported">动态流光背景需要 Android 13 或更高版本。</string>
     <string name="focus_background_blur">背景模糊</string>
     <string name="focus_lyrics">滚动歌词</string>
     <string name="focus_font_size">字号</string>

@@ -117,6 +117,9 @@
     <string name="settings_appearance">Apparence</string>
     <string name="appearance_system">Comme le système</string>
     <string name="focus_background">Arrière-plan</string>
+    <string name="focus_flowing_background">Arrière-plan fluide</string>
+    <string name="focus_flowing_background_description">Utilise un dégradé fluide façon Apple Music qui pulse au rythme de la musique. Désactivez pour retrouver la pochette floutée d\'origine.</string>
+    <string name="focus_flowing_background_unsupported">Le fond animé nécessite Android 13 ou une version ultérieure.</string>
     <string name="focus_background_blur">Flou de l’arrière-plan</string>
     <string name="focus_lyrics">Paroles défilantes</string>
     <string name="focus_font_size">Taille du texte</string>

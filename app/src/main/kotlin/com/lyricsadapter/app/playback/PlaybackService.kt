@@ -6,6 +6,11 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import android.content.Context
+import androidx.media3.exoplayer.audio.TeeAudioProcessor
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.common.util.concurrent.Futures
@@ -47,7 +52,12 @@ class PlaybackService : MediaSessionService() {
         val http = OkHttpClient.Builder().addInterceptor(WebDavAuthorization(settings)).build()
         // Online songs are resolved through their plugin each time a stream opens, since the URLs expire.
         val dataSources = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, OkHttpDataSource.Factory(http)), OnlineStreams(container.sources, container.online))
-        val player = ExoPlayer.Builder(this)
+        // The renderers tap the decoded audio for the flowing background's beat.
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context).setAudioProcessors(arrayOf(TeeAudioProcessor(AudioPulse))).build()
+        }
+        val player = ExoPlayer.Builder(this, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources))
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),

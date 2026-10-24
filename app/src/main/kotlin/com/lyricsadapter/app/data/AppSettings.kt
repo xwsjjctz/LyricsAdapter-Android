@@ -48,6 +48,7 @@ data class FocusSettings(
     val fontSize: Int = 32,
     val lineSpacing: Int = 30,
     val inactiveBlur: Int = 2,
+    val flowingBackground: Boolean = false,
 )
 
 /** App preferences, kept in shared preferences; secrets go through [SecretStore]. */
@@ -72,6 +73,9 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
     val focusFontSize = RangeSetting(prefs, "focusLyricsFontSize", 24..40, 32)
     val focusLineSpacing = RangeSetting(prefs, "focusLyricLineSpacing", 12..48, 30)
     val focusInactiveBlur = RangeSetting(prefs, "focusInactiveLyricBlur", 0..12, 2)
+
+    /** Desktop's `focusAmllBackgroundEnabled`: the flowing background instead of the blurred cover; off by default. */
+    val focusFlowingBackground: Setting<Boolean> = Setting(prefs, "focusAmllBackgroundEnabled", prefs.getString("focusAmllBackgroundEnabled", null) == "true") { it.toString() }
 
     private val webDav = MutableStateFlow(loadWebDav())
 

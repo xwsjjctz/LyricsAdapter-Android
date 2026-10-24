@@ -107,6 +107,9 @@
     <string name="settings_appearance">外観</string>
     <string name="appearance_system">システムに合わせる</string>
     <string name="focus_background">背景</string>
+    <string name="focus_flowing_background">流れる背景</string>
+    <string name="focus_flowing_background_description">Apple Music 風の流れるグラデーション背景を使い、ビートに合わせて脈動させます。オフにすると従来のぼかしたカバー背景に戻ります。</string>
+    <string name="focus_flowing_background_unsupported">動的な流れる背景には Android 13 以降が必要です。</string>
     <string name="focus_background_blur">背景のぼかし</string>
     <string name="focus_lyrics">スクロール歌詞</string>
     <string name="focus_font_size">文字サイズ</string>
