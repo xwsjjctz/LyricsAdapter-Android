@@ -6,8 +6,8 @@ import androidx.compose.runtime.setValue
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/** Where the sung item sits, as a fraction of the view's height from the top. */
-internal const val ANCHOR_FRACTION = 0.26f
+/** Where the sung item's top sits, as a fraction of the view's height (desktop's portrait `alignPosition`). */
+internal const val ANCHOR_FRACTION = 0.1f
 
 private const val STIFFNESS = 110f
 private const val DAMPING_RATIO = 0.9f

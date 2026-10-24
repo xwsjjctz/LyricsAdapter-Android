@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.lyricsadapter.app.R
@@ -60,6 +62,9 @@ private val DISMISS_DISTANCE = 120.dp
 /** The lyrics run on under the controls; this much at the bottom is theirs while they show. */
 private val CONTROLS_SPACE = FOCUS_CONTROLS_HEIGHT + FOCUS_CONTROLS_BOTTOM
 private const val CONTROLS_FADE_MS = 200
+
+/** Scrolling the lyrics by hand shows the controls until the lyrics follow the song again. */
+private const val SCROLL_HOLD = "scroll"
 
 /**
  * The playing track full screen: lyrics over a backdrop made from the cover,
@@ -114,6 +119,7 @@ fun FocusScreen(
                         controlsHeight = CONTROLS_SPACE,
                         controlsShown = { controlsAlpha },
                         settings = settings,
+                        onScrollingChange = { scrolling -> if (scrolling) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
                     )
                     lyrics.plainText.isNotEmpty() -> BasicText(
                         lyrics.plainText,
@@ -167,17 +173,33 @@ private fun Header(track: Track, onClose: () -> Unit, modifier: Modifier = Modif
         ) {
             Box(Modifier.size(width = 36.dp, height = 5.dp).background(Color.White.copy(alpha = 0.35f), RoundedCornerShape(50)))
         }
-        Row(Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Cover(track.coverPath, size = 56.dp)
+        // Desktop's portrait header (`FocusModeLayout.css`): an 88px cover and three lines of text.
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Cover(track.coverPath, size = 88.dp, cornerRadius = 12.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                BasicText(track.title, style = TextStyle(Color.White, 17.sp, FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                BasicText(
+                    track.title,
+                    style = TextStyle(Color.White, 20.sp, FontWeight.ExtraBold, lineHeight = 24.sp, letterSpacing = (-0.025).em),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
                 BasicText(
                     track.artist ?: stringResource(R.string.unknown_artist),
-                    style = TextStyle(Color.White.copy(alpha = 0.6f), 15.sp),
+                    style = TextStyle(Color.White.copy(alpha = 0.8f), 14.sp, FontWeight.SemiBold, lineHeight = 19.6.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                track.album?.takeIf(String::isNotBlank)?.let { album ->
+                    BasicText(
+                        album,
+                        style = TextStyle(Color.White.copy(alpha = 0.4f), 12.sp, FontWeight.Medium, lineHeight = 16.8.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
         }
     }

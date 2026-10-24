@@ -83,9 +83,9 @@ fun IconButton(icon: Int, label: String, tint: Color, size: Dp = 24.dp, onClick:
 }
 
 @Composable
-fun Cover(path: String?, size: Dp, modifier: Modifier = Modifier) {
+fun Cover(path: String?, size: Dp, modifier: Modifier = Modifier, cornerRadius: Dp = 6.dp) {
     val colors = LocalAppColors.current
-    Box(modifier.size(size).clip(RoundedCornerShape(6.dp)).background(colors.surface)) {
+    Box(modifier.size(size).clip(RoundedCornerShape(cornerRadius)).background(colors.surface)) {
         if (path != null) {
             // Local and cloud covers are files; online covers are the source's URLs.
             val model: Any = if (path.startsWith("http")) path else File(path)

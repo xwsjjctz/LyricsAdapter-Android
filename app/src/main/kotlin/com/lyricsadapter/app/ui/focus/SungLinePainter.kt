@@ -25,8 +25,15 @@ import com.lyricsadapter.lyrics.LyricLine
 import kotlin.math.PI
 import kotlin.math.sin
 
-internal val UNSUNG = Color.White.copy(alpha = 0.35f)
-internal val SUNG = Color.White
+/*
+ * AMLL's alphas: every line not being sung is at 0.2. The sung line's words
+ * rise to 0.96 once sung, and those still to come to 0.4; a line without word
+ * timing lights as a whole, at AMLL's 0.85 line opacity.
+ */
+internal val INACTIVE = Color.White.copy(alpha = 0.2f)
+private val SUNG = Color.White.copy(alpha = 0.96f)
+private val UPCOMING = Color.White.copy(alpha = 0.4f)
+private val WHOLE_LINE = Color.White.copy(alpha = 0.96f * 0.85f)
 
 /** How far a sung word rises. */
 private val LIFT = 3.dp
@@ -73,12 +80,12 @@ internal class SungLinePainter(
 
     fun draw(scope: DrawScope, positionMs: Long, emphasis: Float) = with(scope) {
         val layout = layout ?: return
-        val sung = lerp(UNSUNG, SUNG, emphasis)
         if (!wordTimed) {
-            // A line without word timing lights up as a whole.
-            drawText(layout, color = sung)
+            drawText(layout, color = lerp(INACTIVE, WHOLE_LINE, emphasis))
             return
         }
+        val sung = lerp(INACTIVE, SUNG, emphasis)
+        val upcoming = lerp(INACTIVE, UPCOMING, emphasis)
         val finished = words.indexOfFirst { it.endMs > positionMs }.let { if (it < 0) words.size else it }
         val lift = LIFT.toPx() * emphasis
         if (finished > 0) {
@@ -88,20 +95,19 @@ internal class SungLinePainter(
         val singing = current != null && positionMs >= current.startMs
         val restFrom = if (singing) finished + 1 else finished
         if (restFrom < words.size) {
-            clipPath(range(startOf(restFrom), line.text.length).first) { drawText(layout, color = UNSUNG) }
+            clipPath(range(startOf(restFrom), line.text.length).first) { drawText(layout, color = upcoming) }
         }
-        if (current != null && singing) drawSinging(layout, finished, positionMs, emphasis)
+        if (current != null && singing) drawSinging(layout, finished, positionMs, emphasis, sung, upcoming)
     }
 
-    private fun DrawScope.drawSinging(layout: TextLayoutResult, index: Int, positionMs: Long, emphasis: Float) {
+    private fun DrawScope.drawSinging(layout: TextLayoutResult, index: Int, positionMs: Long, emphasis: Float, sung: Color, upcoming: Color) {
         val word = words[index]
         val progress = ((positionMs - word.startMs).toFloat() / word.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f)
         val (path, bounds) = range(startOf(index), wordEnds[index])
         val rise = 1f - (1f - progress) * (1f - progress) * (1f - progress)
         val feather = style.fontSize.toPx() * SWEEP_SOFTNESS
         val edge = bounds.left - feather + (bounds.width + 2 * feather) * progress
-        val sung = lerp(UNSUNG, SUNG, emphasis)
-        val sweep = Brush.horizontalGradient(0f to sung, 1f to UNSUNG, startX = edge - feather, endX = edge + feather)
+        val sweep = Brush.horizontalGradient(0f to sung, 1f to upcoming, startX = edge - feather, endX = edge + feather)
         translate(top = -LIFT.toPx() * emphasis * rise) {
             val glow = if (glows(word.durationMs, word.text)) sin(PI.toFloat() * progress) * emphasis else 0f
             if (glow > 0.01f && Build.VERSION.SDK_INT >= 31) drawGlow(layout, index, bounds, glow)

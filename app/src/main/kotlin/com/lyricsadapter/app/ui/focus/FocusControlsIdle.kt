@@ -17,27 +17,29 @@ import kotlinx.coroutines.launch
 /** How long the controls stay after the last touch (desktop's `FOCUS_CONTROLS_IDLE_MS`). */
 private const val IDLE_MS = 1_000L
 
+private const val TOUCH = "touch"
+
 /**
  * Desktop's portrait `FocusControlsIdle`: the controls start hidden, appear
- * when touched, stay while a finger is on them and hide again a second after
- * the last touch. Playback never counts as activity.
+ * while something holds them (a finger on them, or the lyrics being scrolled
+ * by hand) and hide again a second after the last hold ends. Playback never
+ * counts as activity.
  */
 @Stable
 internal class FocusControlsIdle(private val scope: CoroutineScope) {
     var shown by mutableStateOf(false)
         private set
-    private var holds = 0
+    private val holds = mutableSetOf<String>()
     private var timer: Job? = null
 
-    fun hold() {
-        holds++
+    fun hold(key: String) {
+        holds += key
         timer?.cancel()
         shown = true
     }
 
-    fun release() {
-        holds = (holds - 1).coerceAtLeast(0)
-        if (holds > 0) return
+    fun release(key: String) {
+        if (!holds.remove(key) || holds.isNotEmpty()) return
         timer?.cancel()
         timer = scope.launch {
             delay(IDLE_MS)
@@ -55,7 +57,7 @@ internal fun Modifier.wakesControls(idle: FocusControlsIdle): Modifier = pointer
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val wakeOnly = !idle.shown
-        idle.hold()
+        idle.hold(TOUCH)
         if (wakeOnly) down.consume()
         try {
             while (true) {
@@ -64,7 +66,7 @@ internal fun Modifier.wakesControls(idle: FocusControlsIdle): Modifier = pointer
                 if (event.changes.none { it.pressed }) break
             }
         } finally {
-            idle.release()
+            idle.release(TOUCH)
         }
     }
 }
