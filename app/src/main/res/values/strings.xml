@@ -117,6 +117,7 @@
     <string name="back">返回</string>
     <string name="cloud_connected">已连接</string>
     <string name="cloud_not_connected">未连接</string>
+    <string name="settings_language">语言</string>
     <string name="settings_appearance">外观</string>
     <string name="appearance_system">跟随系统</string>
     <string name="focus_background">背景</string>

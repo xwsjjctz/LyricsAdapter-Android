@@ -112,6 +112,26 @@ fun SettingsRow(
     }
 }
 
+/** One choice of a list, ticked when chosen. */
+@Composable
+fun CheckRow(title: String, checked: Boolean, onClick: () -> Unit) {
+    val colors = LocalAppColors.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.RadioButton
+                selected = checked
+            }
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicText(title, style = TextStyle(color = colors.text, fontSize = 16.sp), modifier = Modifier.weight(1f), maxLines = 1)
+        if (checked) Icon(R.drawable.ui_check, colors.accent, size = 20.dp)
+    }
+}
+
 /** A hairline between rows of one group, indented past the icons. */
 @Composable
 fun RowDivider(indent: Boolean = false) {

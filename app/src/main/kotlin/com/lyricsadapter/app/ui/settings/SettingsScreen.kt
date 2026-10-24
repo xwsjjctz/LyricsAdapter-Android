@@ -1,6 +1,8 @@
 package com.lyricsadapter.app.ui.settings
 
 import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.data.AppLanguage
 import com.lyricsadapter.app.data.AppSettings
 import com.lyricsadapter.app.data.ColorMode
 import com.lyricsadapter.app.ui.IconButton
@@ -152,6 +155,7 @@ private fun RootPage(container: AppContainer, onOpen: (SettingsPage) -> Unit) {
 @Composable
 private fun GeneralPage(settings: AppSettings) {
     val mode by settings.colorMode.value.collectAsStateWithLifecycle()
+    if (AppLanguage.supported) LanguageGroup()
     SettingsGroup(title = stringResource(R.string.settings_appearance)) {
         ChoiceRow(
             options = listOf(
@@ -162,6 +166,21 @@ private fun GeneralPage(settings: AppSettings) {
             selected = mode,
             onSelect = settings.colorMode::set,
         )
+    }
+}
+
+/** Desktop's language choice, plus following the system; picking one restarts the screen in that language. */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+private fun LanguageGroup() {
+    val context = LocalContext.current
+    val current = remember { AppLanguage.current(context) }
+    val options = listOf(null to stringResource(R.string.appearance_system)) + AppLanguage.options
+    SettingsGroup(title = stringResource(R.string.settings_language)) {
+        options.forEachIndexed { index, (tag, label) ->
+            if (index > 0) RowDivider()
+            CheckRow(label, checked = tag == current) { if (tag != current) AppLanguage.set(context, tag) }
+        }
     }
 }
 
