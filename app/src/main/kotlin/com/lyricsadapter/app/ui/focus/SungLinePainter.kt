@@ -26,9 +26,9 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /*
- * AMLL's alphas: every line not being sung is at 0.2. The sung line's words
+ * Desktop's alphas, as its focus mode renders them: every line not being sung is at 0.2. The sung line's words
  * rise to 0.96 once sung, and those still to come to 0.4; a line without word
- * timing lights as a whole, at AMLL's 0.85 line opacity.
+ * timing lights as a whole, at 0.85.
  */
 internal val INACTIVE = Color.White.copy(alpha = 0.2f)
 private val SUNG = Color.White.copy(alpha = 0.96f)

@@ -24,6 +24,9 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 - Releases are APKs on GitHub only; no Google Play.
 - Local music comes only from user imports through the Storage Access Framework
   with persisted URI permissions. No MediaStore scanning, no media permissions.
+  The one exception is downloaded online songs: the app inserts them into
+  MediaStore (`Music/LyricsAdapter`) itself, which needs no permission, and
+  imports the returned URI.
 - Do not read or borrow from older Android implementations elsewhere in the
   parent workspace folder.
 
@@ -36,9 +39,10 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `plugin-host-spike/` | JVM command line against the live services (`smoke`, `qq-login`) |
 | `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
 | `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns |
-| `library/` | Pure Kotlin library model: `Track` and building one from read tags |
+| `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output) and download file names |
 | `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
-| `app/` | The Android app: SAF import into Room, Media3 playback service, Compose library list, mini player and focus-mode lyrics |
+| `app/` | The Android app: SAF import into Room, Media3 playback service, library wall and list, command palette, online downloads, settings and focus mode |
+| `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
 | `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
 | `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
 
@@ -52,6 +56,9 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 ./gradlew :lyrics:test :library:test :webdav:test
 node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cases; argument is the desktop checkout
 ./gradlew :app:installDebug                      # installs as com.lyricsadapter.app.debug
+./gradlew :app:installProfile                    # release code (R8) under the debug id and key, for measuring speed
+./gradlew :app:assembleRelease                   # signed when keystore.properties exists at the root (never committed)
+python3 tools/i18n/generate.py                   # after changing values/strings.xml
 ./gradlew :spike-android:connectedDebugAndroidTest
 ```
 
@@ -102,6 +109,10 @@ Vorbis field. Word lyrics follow desktop's `wordLyricsTagService.ts`.
   `derivedStateOf`, so a frame redraws without recomposing; the spike's
   `LyricsView` keeps the UI thread under 3 ms per frame this way.
 - Blur and the AGSL background must stay switchable for slower devices.
+- The same rule covers AMLL's player (`@applemusic-like-lyrics/core`), which
+  desktop's focus mode uses: match what desktop's focus mode shows (measure it
+  in the running app over CDP, as sizes, alphas, blur and timings), and write
+  the Compose code yourself; do not port its source.
 
 ## Matching desktop behaviour
 
@@ -111,6 +122,16 @@ truth: plugin manifest and host contract (`src/shared/musicPlugin.ts`,
 (`src/shared/onlineMusic.ts`), lyrics parsing (`src/shared/lrcParser.ts`) and the
 WebDAV Metadata v3 format. Cite the desktop file you follow, and pin expected
 values in tests (as `LegacyMusicPluginTest` does with vectors produced by Node).
+
+## Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the
+signed release APK (version name from the tag) and attaches it to the tag's
+GitHub release. It needs the `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`
+secrets. Release builds use R8: keep rules for reflection-based code (JNA and
+the UniFFI bindings) live in `app/proguard-rules.pro`, and resources must be
+loaded by absolute path, because R8 moves classes between packages.
 
 ## Build notes
 

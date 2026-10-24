@@ -2,13 +2,15 @@
 
 [LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端。技术验证（QuickJS 跑插件、lofty 读写标签、Compose 逐字歌词）已完成，应用已覆盖桌面版的主要页面：
 
-- 曲库：本地、云端、在线播放记录、歌单四个槽位；海报墙（桌面窄屏布局）与 Apple Music 风格列表可切换；长按菜单、多选移除
-- 命令面板（手机上的 ⌘K）：本地、云端、各音乐源与歌单的统一搜索（支持拼音），以及全部功能命令
+- 曲库：本地、云端、在线播放记录、歌单四个槽位；海报墙（窄屏用桌面的 6 列模板，宽于 720dp 用桌面的分带排列）与 Apple Music 风格列表可切换；长按菜单、多选移除
+- 命令面板（手机上的 ⌘K）：本地、云端、各音乐源与歌单的统一搜索（支持拼音），全部功能命令，子命令（打开歌单、管理歌单显示）
+- 在线歌曲下载：128kbps / 320kbps / FLAC，按实际音质命名，写入标签、歌词、逐字歌词和封面，存到 Music/LyricsAdapter 并加入本地曲库；封面上显示进度
 - 元数据编辑：封面、标题、艺术家、专辑、歌词（含逐字歌词原文），写回文件
-- 专注模式：桌面同款背景与竖屏控制区，逐字歌词、错落滚动、间奏、长音光晕
+- 专注模式：桌面同款背景、竖屏与横屏布局、控制区；逐字歌词、错落滚动、间奏、长音光晕，透明度与模糊取 AMLL 的值
 - 云端曲库：WebDAV，读取桌面写的 Metadata v3，清单外的歌曲从文件头读标签
 - 插件：官方目录下载或本地安装，扫码 / Cookie 登录，在线搜索、播放、歌词与歌单
-- 设置：通用、专注模式、云端曲库、插件、关于
+- 设置：通用（语言、外观）、专注模式、云端曲库、插件、关于
+- 语言：中文、English、日本語、한국어、Deutsch、Français（与桌面相同；Android 13 起可在应用内单独设置）
 
 ## 结构
 
@@ -19,7 +21,7 @@
 | `plugin-host-spike/` | 桌面 JVM 上的命令行：`smoke` 对真实接口做冒烟检查，`qq-login` 走 QQ 扫码登录后再测需要登录的接口 |
 | `audio-tags/` | 标签读写：Rust crate（`rust/`，lofty 0.25，与桌面的 music-tag-native 同一版本线）经 UniFFI 生成 Kotlin 绑定（`src/main/kotlin`，已生成，改 Rust 后运行 `generateBindings`）。`fixtures/` 用桌面同款库生成带标签的样本和桌面读到的期望值 |
 | `lyrics/` | 纯 Kotlin 的 LRC/QRC/YRC 解析与歌词行模型；`fixtures/` 记录桌面 `lrcParser.ts` 对同一批输入的解析结果，测试逐项对照 |
-| `library/` | 纯 Kotlin 的曲库模型：`Track`，以及从读到的标签生成 `Track` |
+| `library/` | 纯 Kotlin 的曲库模型：`Track`、海报墙布局（`wall/`，窄屏模板与宽屏分带，测试与桌面 TypeScript 的输出逐格比对）、下载文件命名 |
 | `app/` | 安卓应用：系统文件选择器导入（持久化授权）、标签存入 Room、Media3 后台播放（通知栏、锁屏、耳机拔出暂停）、Apple Music 风格的曲库列表、迷你播放条、专注模式歌词（点歌词跳转） |
 | `buildSrc/` | 两个安卓工程共用的 cargo-ndk 构建任务 |
 | `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查；构建时用 cargo-ndk 编出 `libaudio_tags.so`。桌面图标打开的是歌词渲染原型（`src/main/kotlin/.../lyrics/`），演示歌词由 `tools/demo-lyrics.mjs` 交给桌面仓库的 `lrcParser.ts` 解析生成，歌词文字是原创的 |
@@ -38,6 +40,9 @@
 (cd audio-tags/fixtures && npm install && npm run generate)  # 重新生成样本与期望值，需要 ffmpeg 和 metaflac
 ./gradlew :lyrics:test :library:test                   # 歌词解析与桌面对照、曲库模型
 ./gradlew :app:installDebug                             # 应用的 debug 构建，包名 com.lyricsadapter.app.debug
+./gradlew :app:installProfile                           # 正式版代码（R8）、debug 包名和签名，覆盖安装后测性能
+./gradlew :app:assembleRelease                          # 正式版；没有 keystore.properties 时不签名
+python3 tools/i18n/generate.py                          # 改了 values/strings.xml 后重新生成其他语言
 ./gradlew :spike-android:connectedDebugAndroidTest      # 需要已连接的设备或模拟器
 ./gradlew :spike-android:installBenchmark               # 测歌词帧率用不可调试的 benchmark 构建
 node spike-android/tools/demo-lyrics.mjs ../LyricsAdapter    # 重新生成演示歌词，参数是桌面仓库路径
@@ -50,6 +55,33 @@ adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez b
 ```
 
 安卓工程需要 `local.properties` 里的 `sdk.dir`、SDK Platform 37（OkHttp 5.5 要求 `compileSdk >= 37`）、NDK，以及 Rust 工具链（`aarch64-linux-android`、`x86_64-linux-android` 目标和 `cargo-ndk`）。
+
+## 发布
+
+APK 只发在 GitHub Release。推送 `v*` 标签时 `.github/workflows/release.yml` 构建签名的正式版，版本名取自标签，并附到该标签的 Release。仓库需要四个 secret：`ANDROID_KEYSTORE_BASE64`（`.jks` 的 base64）、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。
+
+生成签名密钥（只做一次，丢失后已安装的用户无法升级，务必备份）：
+
+```sh
+keytool -genkeypair -v -keystore lyricsadapter-release.jks -alias lyricsadapter -keyalg RSA -keysize 4096 -validity 36500
+base64 -i lyricsadapter-release.jks | pbcopy    # 粘贴到 ANDROID_KEYSTORE_BASE64
+```
+
+本地构建签名版时，在仓库根目录放 `keystore.properties`（已被 .gitignore 忽略）：
+
+```properties
+storeFile=/绝对路径/lyricsadapter-release.jks
+storePassword=…
+keyAlias=lyricsadapter
+keyPassword=…
+```
+
+## 真机验证（2026-10-24，努比亚 NX769J，骁龙 8 Gen 3，Android 16，60 Hz）
+
+- QQ 音乐扫码登录（真实账号）：登录后搜索、320 取流、QRC 逐字歌词、歌单都正常。
+- 专注模式逐字歌词播放 20 秒（profile 构建）：1219 帧，卡顿 0.25%，没有掉帧；debug 构建卡顿 1.08%。
+- profile 构建（R8）：插件搜索、标签读写（JNA）、Room、播放与下载都正常。
+- 下载：320kbps 8.7 MB、FLAC 46.8 MB，标签、歌词、QRC、封面读回正确。
 
 ## 验证结果（2026-10-22）
 
@@ -82,12 +114,12 @@ adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez b
 ## 已知问题与待办
 
 - 网易云、QQ 的音频 CDN 返回 `http://` 地址，安卓默认禁止明文流量。网易云 CDN 换成 https 同样返回 206；正式版应优先自动升级到 https，用户自建 WebDAV（局域网 http）另行处理。
-- 需要登录的 QQ 接口（搜索、取流、QRC 逐字歌词解密）尚未验证，要扫码后运行 `qq-login`。
 - 尚未实现新格式插件（`activate(context)`，如歌词翻译）的 SDK：`network.fetchText`、`storage`、`secrets`、`cache`、`configuration`。
 - 插件和应用在同一进程（每个插件一个独立运行时）。要做到桌面那样的崩溃隔离，需要移到 `:plugin` 进程；事件循环异常退出后应由上层重建运行时。
 - 兼容层 693 KB（未压缩）。启动已经够快，之后可以再压缩，或缓存 QuickJS 字节码。
 - 标签写入是原地修改，中途被杀可能损坏文件；正式版应先写到临时副本再替换，或至少在写之前备份。
-- 发布版开启 R8 时需要为 JNA 和 UniFFI 生成的类加 keep 规则；armeabi-v7a 设备需要再加一个 Rust 目标。
+- armeabi-v7a 设备需要再加一个 Rust 目标。
 - M4A 等其他格式仍走通用标签整体保存，lofty 不认识的条目会丢失。
-- 专注模式（`app/.../ui/focus/`）：背景与桌面经典背景一致（封面铺满后 80 px 模糊、饱和度 1.5、亮度 0.55、上下黑色渐变）；播放控制区照桌面竖屏三行布局（进度、走带、音量行：静音、系统媒体音量滑条、播放顺序，插件能翻译时左侧出现翻译按钮），图标用同一套 Material Symbols Rounded；控制区与桌面一样进入时隐藏、触碰后出现、停手 1 秒后淡出，隐藏时触碰只唤出不触发按钮，歌词延伸到控制区下方；歌词时钟照桌面 `useFocusPlaybackClock` 按帧推进、只在偏差超过 250 ms 时重新对齐，不会倒退；歌词有换行时逐行错开的弹簧滚动、唱到的字上浮、长音光晕、间奏三点、手动拖动歌词（去模糊，3 秒后回到当前行）。还没有：桌面可选的 AMLL 流动背景、按字的缩放动画、翻译与音译行、对唱和背景人声（需要 TTML）、横屏布局；真机上的帧率还要看。字体用系统字体，不打包苹方/SF（授权不允许分发）。
-- 应用尚未有：编辑标签、删除歌曲、播放队列与随机/循环、进度条、搜索、在线音乐与插件接入、WebDAV、设置、宽屏布局。源文件被移动或删除后，曲目会留在列表里但无法播放，需要检测并提示。
+- 专注模式（`app/.../ui/focus/`）：背景与桌面经典背景一致（封面铺满后 80 px 模糊、饱和度 1.5、亮度 0.55、上下黑色渐变）；竖屏照桌面竖屏（88 px 封面头部、当前行顶部对齐在 10%、顶部 72 px 渐隐），横屏照桌面横屏（左侧大封面，右侧歌词行中心对齐在 35%）；歌词按 AMLL 取值：非当前行 0.2、当前行未唱 0.4、已唱 0.96，模糊每行 0.8 px（上方多两行，最多 5 px，按 CSS sigma 换算），行高 1.12、字距 -0.025em；控制区进入时隐藏，触碰控制区或手动滚动歌词时出现，停手 1 秒后淡出；间奏三点按 AMLL 的尺寸和节奏。还没有：AMLL 流动背景、翻译与音译行（需要插件 API 1.1）、对唱和背景人声（需要 TTML）。字体用系统字体，不打包苹方/SF（授权不允许分发）。
+- 云端元数据只读：桌面只对 123 云盘写回 `/Metadata`（通用 WebDAV 不写），安卓还没有写回；需要真实的 123 云盘账号验证后再做。
+- 源文件被移动或删除后，曲目会留在列表里但无法播放，需要检测并提示。

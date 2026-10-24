@@ -62,7 +62,7 @@ private const val LETTER_SPACING = -0.025f
 /** The lyrics' side margins; desktop's portrait text starts 40px in on a 402px-wide window. */
 private val LINE_PADDING = 36.dp
 
-/** AMLL's blur: 0.8px per line of distance, two more above the sung line, never past 5px. */
+/** Desktop's blur, measured on its focus mode: 0.8px per line of distance, two more above the sung line, never past 5px. */
 private const val BLUR_PER_LINE = 0.8f
 private const val MAX_BLUR = 5f
 
@@ -77,7 +77,7 @@ private fun lineStyle(fontSize: Int) = TextStyle(
     color = INACTIVE,
 )
 
-/** AMLL's `computeLineBlur` for a line [distance] lines from the sung one (negative above it). */
+/** The blur of a line [distance] lines from the sung one (negative above it). */
 private fun lineBlur(distance: Float, strength: Float): Float {
     val lines = if (distance < 0) -distance + 2 else distance
     return (lines * BLUR_PER_LINE).coerceAtMost(MAX_BLUR) * strength
