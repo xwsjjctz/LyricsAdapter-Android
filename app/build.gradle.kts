@@ -1,7 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+/**
+ * The release key, from `keystore.properties` at the repository root
+ * (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), which is never
+ * committed. Without it release builds come out unsigned.
+ */
+val releaseKey: Properties? = rootProject.file("keystore.properties").takeIf { it.exists() }?.let { file ->
+    Properties().apply { file.inputStream().use { load(it) } }
 }
 
 /** ABIs the app ships; the Rust library is built for each, other libraries' extra ABIs are dropped. */
@@ -25,8 +36,9 @@ android {
         applicationId = "com.lyricsadapter.app"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // Release builds take these from the tag (see .github/workflows/release.yml).
+        versionCode = providers.gradleProperty("appVersionCode").orNull?.toInt() ?: 1
+        versionName = providers.gradleProperty("appVersionName").orNull ?: "0.1.0"
         ndk {
             abiFilters.addAll(appAbis)
         }
@@ -41,10 +53,34 @@ android {
         compose = true
     }
 
+    signingConfigs {
+        releaseKey?.let { key ->
+            create("release") {
+                storeFile = rootProject.file(key.getProperty("storeFile"))
+                storePassword = key.getProperty("storePassword")
+                keyAlias = key.getProperty("keyAlias")
+                keyPassword = key.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         // Lets development builds sit beside an installed release, including the older Android app that used this id.
         getByName("debug") {
             applicationIdSuffix = ".debug"
+        }
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
+        }
+        // Release code under the debug id and key: installs over a development build, keeping its library, to measure speed.
+        create("profile") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
         }
     }
 }

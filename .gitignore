@@ -11,3 +11,7 @@ target/
 # Output of IDE Java/Kotlin builders (VS Code, Eclipse)
 bin/
 ref/
+# Release signing
+keystore.properties
+*.jks
+*.keystore
