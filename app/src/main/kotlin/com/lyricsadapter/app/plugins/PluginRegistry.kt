@@ -4,6 +4,10 @@ import android.content.Context
 import android.util.Log
 import com.lyricsadapter.app.data.SecretStore
 import com.lyricsadapter.pluginhost.LegacyMusicPlugin
+import com.lyricsadapter.pluginhost.PlatformManifest
+import com.lyricsadapter.pluginhost.PlatformPlugin
+import com.lyricsadapter.pluginhost.PlatformPluginSettings
+import com.lyricsadapter.pluginhost.PluginCache
 import com.lyricsadapter.pluginhost.PluginDataStore
 import com.lyricsadapter.pluginhost.PluginEnvironment
 import com.lyricsadapter.pluginhost.PluginLogLevel
@@ -33,6 +37,8 @@ data class PluginManifest(
     val requiresCookie: Boolean,
     val capabilities: List<String>,
     val homepage: String?,
+    /** Set for plugins on desktop's plugin platform (`manifestVersion`), such as lyric translation. */
+    val platform: PlatformManifest? = null,
 )
 
 /** An installed plugin as the settings page shows it. */
@@ -60,6 +66,8 @@ class PluginRegistry(
     context: Context,
     private val directory: File,
     private val store: AndroidPluginStore,
+    /** Platform plugins' caches, one folder per plugin; removed with the plugin. */
+    private val dataDirectory: File,
 ) {
     private val prefs = context.getSharedPreferences("plugins", Context.MODE_PRIVATE)
     private val environment by lazy {
@@ -77,13 +85,17 @@ class PluginRegistry(
         )
     }
     private val runtimes = HashMap<String, LegacyMusicPlugin>()
+    private val translators = HashMap<String, PlatformPlugin>()
     private val lock = Mutex()
     private val state = MutableStateFlow(scan())
 
     val plugins: StateFlow<List<InstalledPlugin>> = state.asStateFlow()
 
     /** Enabled plugins that provide music. */
-    fun sources(): List<InstalledPlugin> = state.value.filter { it.enabled }
+    fun sources(): List<InstalledPlugin> = state.value.filter { it.enabled && it.manifest.platform == null }
+
+    /** Enabled plugins that translate lyrics. */
+    fun translationPlugins(): List<InstalledPlugin> = state.value.filter { it.enabled && it.manifest.platform?.translators?.isNotEmpty() == true }
 
     fun cookie(id: String): String = store.readSecret(id, "cookie")
 
@@ -116,6 +128,7 @@ class PluginRegistry(
 
         lock.withLock {
             runtimes.remove(manifest.id)?.close()
+            translators.remove(manifest.id)?.close()
             directory.mkdirs()
             val staging = File(directory, ".package-${manifest.id}")
             staging.deleteRecursively()
@@ -133,14 +146,19 @@ class PluginRegistry(
     suspend fun uninstall(id: String) {
         lock.withLock {
             runtimes.remove(id)?.close()
+            translators.remove(id)?.close()
             File(directory, id).deleteRecursively()
+            File(dataDirectory, id).deleteRecursively()
         }
         refresh()
     }
 
     suspend fun setEnabled(id: String, enabled: Boolean) {
         prefs.edit().putBoolean("music-plugin:$id:enabled", enabled).apply()
-        if (!enabled) lock.withLock { runtimes.remove(id)?.close() }
+        if (!enabled) lock.withLock {
+            runtimes.remove(id)?.close()
+            translators.remove(id)?.close()
+        }
         refresh()
     }
 
@@ -151,6 +169,35 @@ class PluginRegistry(
         val code = File(File(directory, id), plugin.manifest.main).readText()
         LegacyMusicPlugin.start(id, code, environment).also { runtimes[id] = it }
     }
+
+    /** The running platform plugin, started and activated on first use. */
+    suspend fun platformRuntime(id: String): PlatformPlugin = lock.withLock {
+        translators[id]?.let { return it }
+        val plugin = state.value.firstOrNull { it.id == id && it.enabled } ?: throw PluginPackageException("插件未安装或已禁用：$id")
+        val manifest = plugin.manifest.platform ?: throw PluginPackageException("不是插件平台的插件：$id")
+        val code = File(File(directory, id), manifest.main).readText()
+        PlatformPlugin.start(manifest, code, environment, File(dataDirectory, id)).also { translators[id] = it }
+    }
+
+    /** A platform plugin's settings, readable and writable whether or not it is running. */
+    fun platformSettings(id: String): PlatformPluginSettings? =
+        translators[id]?.settings ?: state.value.firstOrNull { it.id == id }?.manifest?.platform?.let { PlatformPluginSettings(it, store) }
+
+    /** Saves one configuration value and tells a running plugin, as desktop's `notifyConfigurationChanged`. */
+    suspend fun setConfiguration(id: String, key: String, value: JsonPrimitive) {
+        val settings = platformSettings(id) ?: throw PluginPackageException("插件未安装：$id")
+        try {
+            settings.set(key, value)
+        } catch (error: IllegalArgumentException) {
+            throw PluginPackageException(error.message ?: "配置无效")
+        }
+        translators[id]?.runCatching { configurationChanged() }
+    }
+
+    /** The plugin's cache size, and clearing it, for the settings page. */
+    fun cacheUsage(id: String): Pair<Int, Long> = PluginCache(File(dataDirectory, id)).usage()
+
+    fun clearCache(id: String) = PluginCache(File(dataDirectory, id)).clear()
 
     /** Re-reads the installed plugins, for example after a login changed what is signed in. */
     fun refresh() {
@@ -186,7 +233,14 @@ class PluginRegistry(
             throw PluginPackageException("插件清单无效")
         }
         if (main == null || !MAIN.matches(main)) throw PluginPackageException("插件入口必须是本地 .cjs 文件")
-        if (json.containsKey("manifestVersion")) throw PluginPackageException("这个插件使用插件核心 API 1.1，安卓版暂不支持")
+        if (json.containsKey("manifestVersion")) {
+            val platform = try {
+                PlatformManifest.parse(json)
+            } catch (error: IllegalArgumentException) {
+                throw PluginPackageException(error.message ?: "插件清单无效")
+            }
+            return PluginManifest(platform.id, platform.name, platform.version, platform.main, false, listOf("translation"), platform.homepage, platform)
+        }
         val requiresCookie = (json["requiresCookie"] as? JsonPrimitive)?.booleanOrNull ?: throw PluginPackageException("插件清单无效")
         val capabilities = (json["capabilities"] as? JsonArray)?.map { it.jsonPrimitive.content } ?: throw PluginPackageException("插件清单无效")
         val apiVersion = (json["apiVersion"] as? JsonPrimitive)?.intOrNull

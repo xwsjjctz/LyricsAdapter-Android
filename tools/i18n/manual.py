@@ -125,11 +125,11 @@ STRINGS = {
     "about_desktop": ["LyricsAdapter for Desktop", "デスクトップ版 LyricsAdapter", "데스크톱용 LyricsAdapter", "LyricsAdapter für den Desktop", "LyricsAdapter pour ordinateur"],
     "about_licenses": ["Open Source Licenses", "オープンソースライセンス", "오픈 소스 라이선스", "Open-Source-Lizenzen", "Licences open source"],
     "plugins_description": [
-        "Download official plugins or install local ones. With a music source enabled you can search and play online music.",
-        "公式プラグインをダウンロードするか、ローカルのプラグインをインストールします。音楽ソースを有効にすると、オンラインの音楽を検索・再生できます。",
-        "공식 플러그인을 내려받거나 로컬 플러그인을 설치하세요. 음악 소스를 켜면 온라인 음악을 검색하고 재생할 수 있습니다.",
-        "Lade offizielle Plugins herunter oder installiere lokale. Mit einer aktivierten Musikquelle kannst du Online-Musik suchen und abspielen.",
-        "Téléchargez des plugins officiels ou installez-en de locaux. Avec une source musicale activée, vous pouvez rechercher et lire de la musique en ligne.",
+        "Download official plugins or install local ones. With a music source enabled you can search and play online music; with a translation plugin, focus mode can show translated lyrics.",
+        "公式プラグインをダウンロードするか、ローカルのプラグインをインストールします。音楽ソースを有効にするとオンラインの音楽を検索・再生でき、翻訳プラグインを有効にするとフォーカスモードで対訳を表示できます。",
+        "공식 플러그인을 내려받거나 로컬 플러그인을 설치하세요. 음악 소스를 켜면 온라인 음악을 검색하고 재생할 수 있고, 번역 플러그인을 켜면 포커스 모드에서 번역된 가사를 볼 수 있습니다.",
+        "Lade offizielle Plugins herunter oder installiere lokale. Mit einer Musikquelle kannst du Online-Musik suchen und abspielen, mit einem Übersetzungs-Plugin zeigt der Fokusmodus übersetzte Songtexte.",
+        "Téléchargez des plugins officiels ou installez-en de locaux. Une source musicale permet de rechercher et lire de la musique en ligne ; un plugin de traduction affiche les paroles traduites en mode focus.",
     ],
     "plugins_installed": ["Installed", "インストール済み", "설치됨", "Installiert", "Installés"],
     "plugins_catalog_loading": [
@@ -203,6 +203,16 @@ STRINGS = {
     "translate": ["Translate", "翻訳", "번역", "Übersetzen", "Traduire"],
     "translated": ["Translated", "翻訳済み", "번역됨", "Übersetzt", "Traduit"],
     "translate_retry": ["Retry translation", "再翻訳", "다시 번역", "Erneut übersetzen", "Retraduire"],
+    "plugin_cache_summary": [
+        "Cache: %1$d items · %2$s", "キャッシュ %1$d 件 · %2$s", "캐시 %1$d개 · %2$s", "Cache: %1$d Einträge · %2$s", "Cache : %1$d éléments · %2$s",
+    ],
+    "translation_language": ["Target language", "翻訳先の言語", "번역 언어", "Zielsprache", "Langue cible"],
+    "plugin_clear_cache": ["Clear cache", "キャッシュを消去", "캐시 지우기", "Cache leeren", "Vider le cache"],
+    "plugin_secret_configured": [
+        "Saved; leave empty to keep", "保存済み。空欄のままなら変更しません", "저장됨, 비워 두면 유지", "Gespeichert; leer lassen, um es zu behalten", "Enregistré ; laisser vide pour conserver",
+    ],
+    "plugin_secret_empty": ["Not set", "未設定", "설정 안 됨", "Nicht festgelegt", "Non défini"],
+    "plugin_kind_translation": ["Lyrics translation", "歌詞の翻訳", "가사 번역", "Songtext-Übersetzung", "Traduction des paroles"],
     "track_download": ["Download", "ダウンロード", "다운로드", "Herunterladen", "Télécharger"],
 }
 

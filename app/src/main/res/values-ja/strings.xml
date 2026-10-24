@@ -128,7 +128,7 @@
     <string name="about_licenses">オープンソースライセンス</string>
     <string name="command_open_settings">設定を開く</string>
     <string name="settings_plugins">音楽ソースプラグイン</string>
-    <string name="plugins_description">公式プラグインをダウンロードするか、ローカルのプラグインをインストールします。音楽ソースを有効にすると、オンラインの音楽を検索・再生できます。</string>
+    <string name="plugins_description">公式プラグインをダウンロードするか、ローカルのプラグインをインストールします。音楽ソースを有効にするとオンラインの音楽を検索・再生でき、翻訳プラグインを有効にするとフォーカスモードで対訳を表示できます。</string>
     <string name="plugins_installed">インストール済み</string>
     <string name="plugins_official">公式プラグイン</string>
     <string name="plugins_catalog_loading">公式プラグイン一覧を読み込み中…</string>
@@ -149,6 +149,13 @@
     <string name="plugin_enable">%1$s を有効にする</string>
     <string name="plugin_account">アカウント</string>
     <string name="plugin_uninstall">アンインストール</string>
+    <string name="plugin_settings">設定</string>
+    <string name="translation_language">翻訳先の言語</string>
+    <string name="plugin_cache_summary">キャッシュ %1$d 件 · %2$s</string>
+    <string name="plugin_clear_cache">キャッシュを消去</string>
+    <string name="plugin_secret_configured">保存済み。空欄のままなら変更しません</string>
+    <string name="plugin_secret_empty">未設定</string>
+    <string name="plugin_kind_translation">歌詞の翻訳</string>
     <string name="plugin_uninstall_title">%1$s をアンインストールしますか？</string>
     <string name="plugin_uninstall_message">プラグインのファイルは削除されます。ログイン情報は残るため、再インストール後もそのまま使えます。</string>
     <string name="track_download">ダウンロード</string>

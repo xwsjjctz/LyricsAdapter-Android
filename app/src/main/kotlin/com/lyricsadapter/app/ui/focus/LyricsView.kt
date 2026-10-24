@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
@@ -108,6 +109,8 @@ fun LyricsView(
     controlsShown: () -> Float = { 0f },
     settings: FocusSettings = FocusSettings(),
     anchor: LyricsAnchor = LyricsAnchor.Top,
+    /** Translated text by line index, shown under each line. */
+    translations: Map<Int, String> = emptyMap(),
     onScrollingChange: (Boolean) -> Unit = {},
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
@@ -191,6 +194,7 @@ fun LyricsView(
                             style = style,
                             gap = gap,
                             blurStrength = blurStrength,
+                            translation = translations[item.index],
                             onClick = {
                                 onLineClick(item.line)
                                 followSong(after = 0)
@@ -238,6 +242,7 @@ private fun LyricLineText(
     style: TextStyle,
     gap: Dp,
     blurStrength: Float,
+    translation: String?,
     onClick: () -> Unit,
 ) {
     val active = distance == 0f
@@ -247,11 +252,8 @@ private fun LyricLineText(
     val glowLayer = rememberGraphicsLayer()
     val painter = remember(line, measurer, glowLayer, style) { SungLinePainter(line, measurer, style, glowLayer) }
 
-    BasicText(
-        text = line.text,
-        style = style,
-        onTextLayout = painter::onLayout,
-        modifier = Modifier
+    Column(
+        Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .padding(horizontal = LINE_PADDING, vertical = gap)
@@ -262,12 +264,42 @@ private fun LyricLineText(
                 transformOrigin = TransformOrigin(0f, 0.5f)
                 val radius = cssBlurRadius(blur.dp.toPx())
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
-            }
-            .drawWithContent {
+            },
+    ) {
+        BasicText(
+            text = line.text,
+            style = style,
+            onTextLayout = painter::onLayout,
+            modifier = Modifier.drawWithContent {
                 if (emphasis > 0f) painter.draw(this, position(), emphasis) else drawContent()
             },
+        )
+        if (translation != null) {
+            val translationStyle = remember(style) { translationStyle(style) }
+            BasicText(
+                text = translation,
+                style = translationStyle,
+                // Desktop's translation line sits at 0.3 inside the line, which is at 0.85 while sung.
+                modifier = Modifier.graphicsLayer { alpha = TRANSLATION_ALPHA * (1f - (1f - SUNG_LINE_ALPHA) * emphasis) },
+            )
+        }
+    }
+}
+
+/** Desktop's translation line: half the lyric size, 1.2 line height, semibold, slightly tighter. */
+private fun translationStyle(style: TextStyle): TextStyle {
+    val size = style.fontSize * 0.5f
+    return TextStyle(
+        fontSize = size,
+        lineHeight = size * 1.2f,
+        letterSpacing = (-0.015f).em,
+        fontWeight = FontWeight.SemiBold,
+        color = Color.White.copy(alpha = 0.96f),
     )
 }
+
+private const val TRANSLATION_ALPHA = 0.3f
+private const val SUNG_LINE_ALPHA = 0.85f
 
 /**
  * The [BlurEffect] radius that blurs as much as CSS `blur(sigma)`: CSS takes

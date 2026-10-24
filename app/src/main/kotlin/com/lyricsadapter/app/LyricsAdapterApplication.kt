@@ -11,6 +11,7 @@ import com.lyricsadapter.app.data.SecretStore
 import com.lyricsadapter.app.data.TrackReader
 import com.lyricsadapter.app.playback.PlayerConnection
 import com.lyricsadapter.app.plugins.AndroidPluginStore
+import com.lyricsadapter.app.plugins.LyricsTranslation
 import com.lyricsadapter.app.plugins.MusicSources
 import com.lyricsadapter.app.plugins.OnlineDownloads
 import com.lyricsadapter.app.plugins.OnlineLibrary
@@ -46,10 +47,11 @@ class AppContainer(context: Context) {
         scope = scope,
     )
     private val pluginStore = AndroidPluginStore(context, secrets)
-    val plugins = PluginRegistry(context, File(context.filesDir, "plugins"), pluginStore).also { registry ->
+    val plugins = PluginRegistry(context, File(context.filesDir, "plugins"), pluginStore, File(context.filesDir, "plugin-data")).also { registry ->
         pluginStore.onSecretsChanged = { registry.refresh() }
     }
     val catalog = PluginCatalog(plugins)
+    val translation = LyricsTranslation(plugins)
     val sources = MusicSources(plugins)
     val online = OnlineLibrary(sources, File(context.filesDir, "online-library.json"), scope)
     val downloads = OnlineDownloads(context.contentResolver, sources, library, File(context.cacheDir, "downloads"), scope)

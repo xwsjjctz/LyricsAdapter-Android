@@ -90,6 +90,7 @@ fun FocusScreen(
     player: PlayerConnection,
     volume: SystemVolume,
     settings: FocusSettings,
+    translation: FocusTranslation,
     onClose: () -> Unit,
 ) {
     val lyrics = remember(track.id) { track.parsedLyrics() }
@@ -126,6 +127,7 @@ fun FocusScreen(
                     controlsShown = { controlsAlpha },
                     settings = settings,
                     anchor = anchor,
+                    translations = translation.lines,
                     onScrollingChange = { scrolling -> if (scrolling) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
                 )
                 lyrics.plainText.isNotEmpty() -> BasicText(
@@ -149,8 +151,8 @@ fun FocusScreen(
             isPlaying = playback.isPlaying,
             mode = playback.mode,
             volume = volumeLevel,
-            // Translation arrives with the plugin host; until a plugin offers it the button stays hidden, as on desktop.
-            translation = TranslationStatus.Unavailable,
+            // Hidden until an enabled plugin can translate, as on desktop.
+            translation = translation.status,
             onSeek = seek,
             onPrevious = player::previous,
             onTogglePlay = player::togglePlay,
@@ -158,7 +160,7 @@ fun FocusScreen(
             onVolumeChange = volume::set,
             onToggleMute = volume::toggleMute,
             onCyclePlaybackMode = player::cyclePlaybackMode,
-            onToggleTranslation = {},
+            onToggleTranslation = translation.toggle,
             modifier = modifier.wakesControls(idle).graphicsLayer { alpha = controlsAlpha },
         )
     }

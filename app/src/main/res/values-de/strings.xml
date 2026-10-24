@@ -133,7 +133,7 @@
     <string name="about_licenses">Open-Source-Lizenzen</string>
     <string name="command_open_settings">Einstellungen öffnen</string>
     <string name="settings_plugins">Musikquellen-Plugins</string>
-    <string name="plugins_description">Lade offizielle Plugins herunter oder installiere lokale. Mit einer aktivierten Musikquelle kannst du Online-Musik suchen und abspielen.</string>
+    <string name="plugins_description">Lade offizielle Plugins herunter oder installiere lokale. Mit einer Musikquelle kannst du Online-Musik suchen und abspielen, mit einem Übersetzungs-Plugin zeigt der Fokusmodus übersetzte Songtexte.</string>
     <string name="plugins_installed">Installiert</string>
     <string name="plugins_official">Offizielle Plugins</string>
     <string name="plugins_catalog_loading">Offizieller Plugin-Katalog wird gelesen…</string>
@@ -154,6 +154,13 @@
     <string name="plugin_enable">%1$s aktivieren</string>
     <string name="plugin_account">Konto</string>
     <string name="plugin_uninstall">Deinstallieren</string>
+    <string name="plugin_settings">Einstellungen</string>
+    <string name="translation_language">Zielsprache</string>
+    <string name="plugin_cache_summary">Cache: %1$d Einträge · %2$s</string>
+    <string name="plugin_clear_cache">Cache leeren</string>
+    <string name="plugin_secret_configured">Gespeichert; leer lassen, um es zu behalten</string>
+    <string name="plugin_secret_empty">Nicht festgelegt</string>
+    <string name="plugin_kind_translation">Songtext-Übersetzung</string>
     <string name="plugin_uninstall_title">%1$s deinstallieren?</string>
     <string name="plugin_uninstall_message">Die Dateien des Plugins werden gelöscht. Deine Anmeldung bleibt erhalten und funktioniert nach einer Neuinstallation wieder.</string>
     <string name="track_download">Herunterladen</string>

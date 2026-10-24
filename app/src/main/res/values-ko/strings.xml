@@ -128,7 +128,7 @@
     <string name="about_licenses">오픈 소스 라이선스</string>
     <string name="command_open_settings">설정 열기</string>
     <string name="settings_plugins">음악 소스 플러그인</string>
-    <string name="plugins_description">공식 플러그인을 내려받거나 로컬 플러그인을 설치하세요. 음악 소스를 켜면 온라인 음악을 검색하고 재생할 수 있습니다.</string>
+    <string name="plugins_description">공식 플러그인을 내려받거나 로컬 플러그인을 설치하세요. 음악 소스를 켜면 온라인 음악을 검색하고 재생할 수 있고, 번역 플러그인을 켜면 포커스 모드에서 번역된 가사를 볼 수 있습니다.</string>
     <string name="plugins_installed">설치됨</string>
     <string name="plugins_official">공식 플러그인</string>
     <string name="plugins_catalog_loading">공식 플러그인 목록을 읽는 중…</string>
@@ -149,6 +149,13 @@
     <string name="plugin_enable">%1$s 사용</string>
     <string name="plugin_account">계정</string>
     <string name="plugin_uninstall">제거</string>
+    <string name="plugin_settings">설정</string>
+    <string name="translation_language">번역 언어</string>
+    <string name="plugin_cache_summary">캐시 %1$d개 · %2$s</string>
+    <string name="plugin_clear_cache">캐시 지우기</string>
+    <string name="plugin_secret_configured">저장됨, 비워 두면 유지</string>
+    <string name="plugin_secret_empty">설정 안 됨</string>
+    <string name="plugin_kind_translation">가사 번역</string>
     <string name="plugin_uninstall_title">%1$s을(를) 제거할까요?</string>
     <string name="plugin_uninstall_message">플러그인 파일은 삭제됩니다. 로그인 정보는 남아 있어 다시 설치하면 계속 사용할 수 있습니다.</string>
     <string name="track_download">다운로드</string>

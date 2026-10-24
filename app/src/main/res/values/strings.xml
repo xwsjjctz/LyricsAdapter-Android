@@ -142,7 +142,7 @@
     <string name="about_licenses">开源许可</string>
     <string name="command_open_settings">打开设置</string>
     <string name="settings_plugins">插件</string>
-    <string name="plugins_description">下载官方插件或安装本地插件。启用音乐源后可以搜索和播放在线音乐。</string>
+    <string name="plugins_description">下载官方插件或安装本地插件。启用音乐源后可以搜索和播放在线音乐，启用翻译插件后可以在专注模式查看对照译文。</string>
     <string name="plugins_installed">已安装</string>
     <string name="plugins_official">官方插件</string>
     <string name="plugins_catalog_loading">正在读取官方插件目录…</string>
@@ -163,6 +163,13 @@
     <string name="plugin_enable">启用 %1$s</string>
     <string name="plugin_account">账号</string>
     <string name="plugin_uninstall">卸载</string>
+    <string name="plugin_settings">设置</string>
+    <string name="translation_language">目标语言</string>
+    <string name="plugin_cache_summary">缓存 %1$d 项 · %2$s</string>
+    <string name="plugin_clear_cache">清除缓存</string>
+    <string name="plugin_secret_configured">已保存，留空保持不变</string>
+    <string name="plugin_secret_empty">未设置</string>
+    <string name="plugin_kind_translation">歌词翻译</string>
     <string name="plugin_uninstall_title">卸载 %1$s？</string>
     <string name="plugin_uninstall_message">插件文件会被删除，登录信息保留，重新安装后可继续使用。</string>
     <string name="track_download">下载</string>

@@ -27,6 +27,9 @@ data class CatalogEntry(
     val description: String?,
 ) {
     val isMusicSource: Boolean get() = kind == "music.source"
+
+    /** Legacy music sources and lyric translation plugins run on Android. */
+    val isSupported: Boolean get() = isMusicSource || kind == "lyrics.translation"
 }
 
 private const val OWNER = "xwsjjctz"

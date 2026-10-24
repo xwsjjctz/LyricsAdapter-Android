@@ -55,6 +55,7 @@ import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.ui.editor.MetadataEditor
 import com.lyricsadapter.app.ui.focus.FocusScreen
+import com.lyricsadapter.app.ui.focus.rememberFocusTranslation
 import com.lyricsadapter.app.ui.palette.CommandPalette
 import com.lyricsadapter.app.plugins.MusicSourceException
 import com.lyricsadapter.app.plugins.OnlinePlaylist
@@ -265,7 +266,11 @@ fun AppScreen(container: AppContainer) {
             )
         }
         AnimatedVisibility(visible = focusOpen && current != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-            if (current != null) FocusScreen(current, playerState, player, container.volume, focusSettings, onClose = { focusOpen = false })
+            if (current != null) {
+                val focusLines = remember(current.id) { current.parsedLyrics().lines }
+                val translation = rememberFocusTranslation(container, current, focusLines)
+                FocusScreen(current, playerState, player, container.volume, focusSettings, translation, onClose = { focusOpen = false })
+            }
         }
         AnimatedVisibility(visible = palette != null, enter = fadeIn(), exit = fadeOut()) {
             val mode = palette

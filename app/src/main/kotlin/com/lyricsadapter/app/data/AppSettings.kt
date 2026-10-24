@@ -65,6 +65,9 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
         prefs.getString("hiddenPlaylists", null)?.split('\n')?.filterTo(mutableSetOf(), String::isNotEmpty).orEmpty(),
     ) { it.joinToString("\n") }
 
+    /** Desktop's `plugin_lyrics_language`: the language lyrics are translated into. */
+    val translationLanguage: Setting<String> = Setting(prefs, "plugin_lyrics_language", prefs.getString("plugin_lyrics_language", null) ?: "zh") { it }
+
     val focusBackgroundBlur = RangeSetting(prefs, "focusBgBlurRadius", 40..80, 80)
     val focusFontSize = RangeSetting(prefs, "focusLyricsFontSize", 24..40, 32)
     val focusLineSpacing = RangeSetting(prefs, "focusLyricLineSpacing", 12..48, 30)

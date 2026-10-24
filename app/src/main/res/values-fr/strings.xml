@@ -138,7 +138,7 @@
     <string name="about_licenses">Licences open source</string>
     <string name="command_open_settings">Ouvrir les paramètres</string>
     <string name="settings_plugins">Plugins de sources musicales</string>
-    <string name="plugins_description">Téléchargez des plugins officiels ou installez-en de locaux. Avec une source musicale activée, vous pouvez rechercher et lire de la musique en ligne.</string>
+    <string name="plugins_description">Téléchargez des plugins officiels ou installez-en de locaux. Une source musicale permet de rechercher et lire de la musique en ligne ; un plugin de traduction affiche les paroles traduites en mode focus.</string>
     <string name="plugins_installed">Installés</string>
     <string name="plugins_official">Plugins officiels</string>
     <string name="plugins_catalog_loading">Lecture du catalogue officiel de plugins…</string>
@@ -159,6 +159,13 @@
     <string name="plugin_enable">Activer %1$s</string>
     <string name="plugin_account">Compte</string>
     <string name="plugin_uninstall">Désinstaller</string>
+    <string name="plugin_settings">Paramètres</string>
+    <string name="translation_language">Langue cible</string>
+    <string name="plugin_cache_summary">Cache : %1$d éléments · %2$s</string>
+    <string name="plugin_clear_cache">Vider le cache</string>
+    <string name="plugin_secret_configured">Enregistré ; laisser vide pour conserver</string>
+    <string name="plugin_secret_empty">Non défini</string>
+    <string name="plugin_kind_translation">Traduction des paroles</string>
     <string name="plugin_uninstall_title">Désinstaller %1$s ?</string>
     <string name="plugin_uninstall_message">Les fichiers du plugin sont supprimés. Votre connexion est conservée et fonctionnera après réinstallation.</string>
     <string name="track_download">Télécharger</string>

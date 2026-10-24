@@ -133,7 +133,7 @@
     <string name="about_licenses">Open Source Licenses</string>
     <string name="command_open_settings">Open Settings</string>
     <string name="settings_plugins">Plugins</string>
-    <string name="plugins_description">Download official plugins or install local ones. With a music source enabled you can search and play online music.</string>
+    <string name="plugins_description">Download official plugins or install local ones. With a music source enabled you can search and play online music; with a translation plugin, focus mode can show translated lyrics.</string>
     <string name="plugins_installed">Installed</string>
     <string name="plugins_official">Official plugins</string>
     <string name="plugins_catalog_loading">Reading the official plugin catalog…</string>
@@ -154,6 +154,13 @@
     <string name="plugin_enable">Enable %1$s</string>
     <string name="plugin_account">Account</string>
     <string name="plugin_uninstall">Uninstall</string>
+    <string name="plugin_settings">Settings</string>
+    <string name="translation_language">Target language</string>
+    <string name="plugin_cache_summary">Cache: %1$d items · %2$s</string>
+    <string name="plugin_clear_cache">Clear cache</string>
+    <string name="plugin_secret_configured">Saved; leave empty to keep</string>
+    <string name="plugin_secret_empty">Not set</string>
+    <string name="plugin_kind_translation">Lyrics translation</string>
     <string name="plugin_uninstall_title">Uninstall %1$s?</string>
     <string name="plugin_uninstall_message">The plugin\'s files are deleted. Your sign-in is kept, so it works again after reinstalling.</string>
     <string name="track_download">Download</string>
