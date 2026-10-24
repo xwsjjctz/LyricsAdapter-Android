@@ -284,6 +284,10 @@ fun AppScreen(container: AppContainer) {
                             player.play(container.online.entries.value.map { it.toTrack() }, 0)
                         },
                         addOnline = container.online::add,
+                        download = { song, quality ->
+                            container.downloads.start(song, quality)
+                            Toast.makeText(context, context.getString(R.string.download_started, song.title), Toast.LENGTH_SHORT).show()
+                        },
                         openPlaylist = openPlaylist,
                     ),
                     commands = commands,

@@ -2,6 +2,7 @@ package com.lyricsadapter.app.ui.palette
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -48,7 +52,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.plugins.DownloadQuality
 import com.lyricsadapter.app.plugins.OnlinePlaylist
+import com.lyricsadapter.app.ui.ContextMenu
+import com.lyricsadapter.app.ui.MenuEntry
 import com.lyricsadapter.app.plugins.OnlineSong
 import com.lyricsadapter.app.search.TextMatcher
 import com.lyricsadapter.app.ui.Cover
@@ -59,6 +66,7 @@ import com.lyricsadapter.app.ui.TextAction
 import com.lyricsadapter.app.ui.formatDuration
 import com.lyricsadapter.library.Track
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /** Desktop's palette groups, in the order they are listed. */
 enum class CommandGroup(val titleRes: Int) {
@@ -100,10 +108,14 @@ class PaletteMusic(
     val playTrack: (Track) -> Unit,
     val playOnline: (OnlineSong) -> Unit,
     val addOnline: (OnlineSong) -> Unit,
+    val download: (OnlineSong, DownloadQuality) -> Unit,
     val openPlaylist: (OnlinePlaylist) -> Unit,
 )
 
 private const val TRACK_LIMIT = 6
+
+/** Where a result's menu opens, from the row's top-left corner, in pixels. */
+private const val MENU_INSET = 96
 private const val ONLINE_LIMIT = 8
 private const val SEARCH_DELAY_MS = 400L
 
@@ -121,6 +133,7 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
     var query by rememberSaveable { mutableStateOf("") }
     var online by remember { mutableStateOf<List<OnlineResults>?>(null) }
     var added by remember { mutableStateOf(emptySet<String>()) }
+    var menu by remember { mutableStateOf<Pair<OnlineSong, IntOffset>?>(null) }
     // The command whose children are listed; looked up by id, so a toggle shows its new state.
     var parentId by rememberSaveable { mutableStateOf<String?>(null) }
     val parent = parentId?.let { id -> commands.firstOrNull { it.id == id } }
@@ -242,6 +255,7 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
                         leading = { Cover(row.song.coverUrl, size = 40.dp) },
                         detail = row.song.duration?.let { formatDuration((it * 1000).toLong()) },
                         onClick = { run(row) },
+                        onLongPress = { anchor -> menu = row.song to anchor },
                         trailing = {
                             val done = row.song.trackId in added
                             IconButton(
@@ -275,6 +289,26 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
                 }
             }
         }
+    }
+    menu?.let { (song, anchor) ->
+        val done = song.trackId in added
+        ContextMenu(
+            anchor = anchor,
+            entries = buildList {
+                add(MenuEntry.Label(stringResource(R.string.track_download)))
+                DownloadQuality.entries.forEach { quality -> add(MenuEntry.Item(quality.label, R.drawable.ui_download) { music.download(song, quality) }) }
+                add(MenuEntry.Separator)
+                add(
+                    MenuEntry.Item(stringResource(if (done) R.string.added_to_online else R.string.add_to_online), if (done) R.drawable.ui_check else R.drawable.ic_add) {
+                        if (!done) {
+                            music.addOnline(song)
+                            added = added + song.trackId
+                        }
+                    },
+                )
+            },
+            onDismiss = { menu = null },
+        )
     }
 }
 
@@ -325,13 +359,20 @@ private fun ResultRow(
     detail: String?,
     onClick: () -> Unit,
     trailing: (@Composable () -> Unit)? = null,
+    onLongPress: ((IntOffset) -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
+    var origin by remember { mutableStateOf(IntOffset.Zero) }
     Row(
         Modifier
             .fillMaxWidth()
+            .onGloballyPositioned { origin = it.positionInWindow().let { p -> IntOffset(p.x.roundToInt(), p.y.roundToInt()) } }
             .semantics { role = Role.Button }
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClickLabel = onLongPress?.let { stringResource(R.string.song_actions) },
+                onLongClick = onLongPress?.let { open -> { open(origin + IntOffset(MENU_INSET, MENU_INSET)) } },
+            )
             .padding(start = 16.dp, end = if (trailing != null) 4.dp else 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
