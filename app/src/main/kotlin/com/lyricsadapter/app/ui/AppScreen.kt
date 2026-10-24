@@ -86,6 +86,7 @@ fun AppScreen(container: AppContainer) {
     val downloads by container.downloads.progress.collectAsStateWithLifecycle()
     val openedPlaylist by container.online.playlist.collectAsStateWithLifecycle()
     val plugins by container.plugins.plugins.collectAsStateWithLifecycle()
+    val hiddenPlaylists by settings.hiddenPlaylists.value.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
     val slot by settings.activeSlot.value.collectAsStateWithLifecycle()
     val layout by settings.libraryLayout.value.collectAsStateWithLifecycle()
@@ -142,6 +143,21 @@ fun AppScreen(container: AppContainer) {
         selection = null
         settings.activeSlot.set(target)
     }
+    // The account playlists, loaded when the sources or their logins change and again whenever the palette opens.
+    var playlists by remember { mutableStateOf<List<OnlinePlaylist>>(emptyList()) }
+    LaunchedEffect(plugins, palette != null) { playlists = loadPlaylists(container) }
+    val playlistKey = { playlist: OnlinePlaylist -> "${playlist.source}:${playlist.id}" }
+    val openPlaylist = { playlist: OnlinePlaylist ->
+        scope.launch {
+            try {
+                container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
+                switchSlot(SlotId.Playlist)
+            } catch (error: MusicSourceException) {
+                Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+        Unit
+    }
 
     BackHandler(enabled = selection != null) { selection = null }
     BackHandler(enabled = focusOpen) { focusOpen = false }
@@ -177,6 +193,12 @@ fun AppScreen(container: AppContainer) {
             wall = layout == LibraryLayout.Wall,
             toggleLayout = { settings.libraryLayout.set(if (layout == LibraryLayout.Wall) LibraryLayout.List else LibraryLayout.Wall) },
             refreshCloud = if (cloudStatus != CloudStatus.NotConnected) container.cloud::refresh else null,
+            playlists = playlists.map { it to (playlistKey(it) in hiddenPlaylists) },
+            openPlaylist = openPlaylist,
+            togglePlaylistHidden = { playlist ->
+                val key = playlistKey(playlist)
+                settings.hiddenPlaylists.set(if (key in hiddenPlaylists) hiddenPlaylists - key else hiddenPlaylists + key)
+            },
         ),
     )
 
@@ -249,7 +271,7 @@ fun AppScreen(container: AppContainer) {
                         localTracks = localTracks,
                         cloudTracks = cloudList,
                         searchOnline = { query -> searchSources(container, query) },
-                        loadPlaylists = { loadPlaylists(container) },
+                        playlists = playlists.filterNot { playlistKey(it) in hiddenPlaylists },
                         playTrack = { track ->
                             val (target, list) = if (cloudList.any { it.id == track.id }) SlotId.Cloud to cloudList else SlotId.Local to localTracks
                             switchSlot(target)
@@ -262,16 +284,7 @@ fun AppScreen(container: AppContainer) {
                             player.play(container.online.entries.value.map { it.toTrack() }, 0)
                         },
                         addOnline = container.online::add,
-                        openPlaylist = { playlist ->
-                            scope.launch {
-                                try {
-                                    container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
-                                    switchSlot(SlotId.Playlist)
-                                } catch (error: MusicSourceException) {
-                                    Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
+                        openPlaylist = openPlaylist,
                     ),
                     commands = commands,
                     initialMode = mode,

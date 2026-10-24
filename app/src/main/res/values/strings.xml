@@ -99,6 +99,10 @@
     <string name="command_playback_mode">切换播放顺序</string>
     <string name="command_mute">静音切换</string>
     <string name="command_color_mode">黑白切换</string>
+    <string name="command_open_playlist">打开歌单</string>
+    <string name="command_manage_playlists">管理歌单显示</string>
+    <string name="palette_state_hidden">已隐藏</string>
+    <string name="palette_state_shown">显示中</string>
     <string name="command_state_on">开</string>
     <string name="command_state_off">关</string>
     <string name="state_dark">深色</string>

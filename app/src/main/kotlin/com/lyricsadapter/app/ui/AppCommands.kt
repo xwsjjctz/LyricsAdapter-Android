@@ -5,6 +5,7 @@ import androidx.compose.ui.res.stringResource
 import com.lyricsadapter.app.R
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.playback.PlaybackMode
+import com.lyricsadapter.app.plugins.OnlinePlaylist
 import com.lyricsadapter.app.ui.palette.CommandGroup
 import com.lyricsadapter.app.ui.palette.PaletteCommand
 import com.lyricsadapter.app.ui.settings.SettingsPage
@@ -33,7 +34,47 @@ class CommandDeps(
     val toggleLayout: () -> Unit,
     /** Null while no WebDAV library is connected. */
     val refreshCloud: (() -> Unit)?,
+    /** Every account playlist, and whether it is hidden from the library. */
+    val playlists: List<Pair<OnlinePlaylist, Boolean>>,
+    val openPlaylist: (OnlinePlaylist) -> Unit,
+    val togglePlaylistHidden: (OnlinePlaylist) -> Unit,
 )
+
+/** Desktop's `playlistCommands`: open a shown playlist, or choose which ones are shown. */
+@Composable
+private fun playlistCommands(deps: CommandDeps): List<PaletteCommand> {
+    if (deps.playlists.isEmpty()) return emptyList()
+    val hidden = stringResource(R.string.palette_state_hidden)
+    val shown = stringResource(R.string.palette_state_shown)
+    val visible = deps.playlists.filterNot { it.second }.map { it.first }
+    return listOf(
+        PaletteCommand(
+            "playlist.open", CommandGroup.Library, stringResource(R.string.command_open_playlist), R.drawable.ui_queue_music,
+            detail = visible.size.toString(), keywords = listOf("playlist"),
+            children = {
+                visible.map { playlist ->
+                    PaletteCommand(
+                        "playlist.open.${playlist.source}.${playlist.id}", CommandGroup.Library, playlist.name, R.drawable.ui_queue_music,
+                        detail = playlist.songCount.toString(),
+                    ) { deps.openPlaylist(playlist) }
+                }
+            },
+        ),
+        PaletteCommand(
+            "playlist.manage", CommandGroup.Library, stringResource(R.string.command_manage_playlists), R.drawable.ui_visibility,
+            keywords = listOf("playlist", "hide", "show"),
+            children = {
+                deps.playlists.map { (playlist, isHidden) ->
+                    PaletteCommand(
+                        "playlist.toggle.${playlist.source}.${playlist.id}", CommandGroup.Library, playlist.name,
+                        if (isHidden) R.drawable.ui_visibility_off else R.drawable.ui_visibility,
+                        detail = if (isHidden) hidden else shown, keepOpen = true,
+                    ) { deps.togglePlaylistHidden(playlist) }
+                }
+            },
+        ),
+    )
+}
 
 /**
  * The palette's command list, following desktop's `buildAppCommands`: ids,
@@ -76,6 +117,7 @@ fun appCommands(deps: CommandDeps): List<PaletteCommand> {
             add(PaletteCommand("library.refreshCloud", CommandGroup.Library, stringResource(R.string.cloud_refresh), R.drawable.ui_sync, keywords = listOf("webdav", "cloud"), run = refresh))
         }
         add(PaletteCommand("library.import", CommandGroup.Library, stringResource(R.string.import_files), R.drawable.ui_library_add, keywords = listOf("import"), run = deps.importFiles))
+        addAll(playlistCommands(deps))
         if (deps.hasTracks) {
             add(PaletteCommand("library.select", CommandGroup.Library, stringResource(R.string.select_multiple), R.drawable.ui_checklist, run = deps.selectMultiple))
             add(PaletteCommand("playback.playAll", CommandGroup.Playback, stringResource(R.string.command_play_all), R.drawable.ui_play_arrow, run = deps.playAll))

@@ -1,5 +1,6 @@
 package com.lyricsadapter.app.ui.palette
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -76,7 +77,11 @@ class PaletteCommand(
     val icon: Int,
     val detail: String? = null,
     val keywords: List<String> = emptyList(),
-    val run: () -> Unit,
+    /** Commands listed one level down, as desktop's command children; picking this one opens them. */
+    val children: (() -> List<PaletteCommand>)? = null,
+    /** Runs without closing the palette, for toggles in a list. */
+    val keepOpen: Boolean = false,
+    val run: () -> Unit = {},
 )
 
 /** The palette searches music, or the app's commands, as desktop's two modes. */
@@ -90,7 +95,8 @@ class PaletteMusic(
     val localTracks: List<Track>,
     val cloudTracks: List<Track>,
     val searchOnline: suspend (String) -> List<OnlineResults>,
-    val loadPlaylists: suspend () -> List<OnlinePlaylist>,
+    /** The account playlists the library shows (hidden ones left out). */
+    val playlists: List<OnlinePlaylist>,
     val playTrack: (Track) -> Unit,
     val playOnline: (OnlineSong) -> Unit,
     val addOnline: (OnlineSong) -> Unit,
@@ -114,11 +120,12 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
     var mode by rememberSaveable { mutableStateOf(initialMode) }
     var query by rememberSaveable { mutableStateOf("") }
     var online by remember { mutableStateOf<List<OnlineResults>?>(null) }
-    var playlists by remember { mutableStateOf<List<OnlinePlaylist>>(emptyList()) }
     var added by remember { mutableStateOf(emptySet<String>()) }
+    // The command whose children are listed; looked up by id, so a toggle shows its new state.
+    var parentId by rememberSaveable { mutableStateOf<String?>(null) }
+    val parent = parentId?.let { id -> commands.firstOrNull { it.id == id } }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
-    LaunchedEffect(Unit) { playlists = music.loadPlaylists() }
     LaunchedEffect(mode, query) {
         online = null
         if (mode != PaletteMode.Library || query.isBlank()) return@LaunchedEffect
@@ -132,21 +139,37 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
         playlists = stringResource(R.string.slot_playlist),
         commandTitles = CommandGroup.entries.associateWith { stringResource(it.titleRes) },
     )
-    val rows = remember(mode, query, music.localTracks, music.cloudTracks, online, playlists, commands) {
-        when (mode) {
-            PaletteMode.Library -> libraryRows(music, query, online, playlists, sections)
-            PaletteMode.Commands -> commandRows(commands, query, sections)
+    val rows = remember(mode, query, music.localTracks, music.cloudTracks, music.playlists, online, commands, parent) {
+        when {
+            parent != null -> childRows(parent.children?.invoke().orEmpty(), query)
+            mode == PaletteMode.Library -> libraryRows(music, query, online, music.playlists, sections)
+            else -> commandRows(commands, query, sections)
         }
     }
     val searching = mode == PaletteMode.Library && query.isNotBlank() && online == null
     val run = { row: PaletteRow.Runnable ->
-        onClose()
-        when (row) {
-            is PaletteRow.TrackRow -> music.playTrack(row.track)
-            is PaletteRow.OnlineRow -> music.playOnline(row.song)
-            is PaletteRow.PlaylistRow -> music.openPlaylist(row.playlist)
-            is PaletteRow.CommandRow -> row.command.run()
+        val command = (row as? PaletteRow.CommandRow)?.command
+        when {
+            command?.children != null -> {
+                parentId = command.id
+                query = ""
+            }
+            command?.keepOpen == true -> command.run()
+            else -> {
+                onClose()
+                when (row) {
+                    is PaletteRow.TrackRow -> music.playTrack(row.track)
+                    is PaletteRow.OnlineRow -> music.playOnline(row.song)
+                    is PaletteRow.PlaylistRow -> music.openPlaylist(row.playlist)
+                    is PaletteRow.CommandRow -> row.command.run()
+                }
+            }
         }
+    }
+    // Back leaves the children first, as Escape does on desktop.
+    BackHandler(enabled = parent != null) {
+        parentId = null
+        query = ""
     }
 
     Column(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().imePadding()) {
@@ -177,11 +200,18 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
             }
             TextAction(stringResource(R.string.cancel), onClick = onClose)
         }
-        ModeSwitch(mode, onChange = { mode = it }, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+        if (parent != null) {
+            ParentHeader(parent.title, onBack = {
+                parentId = null
+                query = ""
+            })
+        } else {
+            ModeSwitch(mode, onChange = { mode = it }, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+        }
         if (rows.isEmpty()) {
             val hint = when {
                 searching -> R.string.palette_searching
-                mode == PaletteMode.Library && query.isBlank() -> R.string.palette_library_hint
+                parent == null && mode == PaletteMode.Library && query.isBlank() -> R.string.palette_library_hint
                 else -> R.string.palette_no_results
             }
             BasicText(stringResource(hint), style = TextStyle(color = colors.secondaryText, fontSize = 15.sp), modifier = Modifier.fillMaxWidth().padding(24.dp))
@@ -240,10 +270,21 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
                         leading = { Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(row.command.icon, colors.accent) } },
                         detail = row.command.detail,
                         onClick = { run(row) },
+                        trailing = row.command.children?.let { { Icon(R.drawable.ui_chevron_right, colors.secondaryText, Modifier.padding(end = 12.dp), size = 20.dp) } },
                     )
                 }
             }
         }
+    }
+}
+
+/** In place of the mode switch while a command's children are listed: back, and the command's name. */
+@Composable
+private fun ParentHeader(title: String, onBack: () -> Unit) {
+    val colors = LocalAppColors.current
+    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(R.drawable.ui_arrow_back, stringResource(R.string.back), tint = colors.accent, size = 22.dp, onClick = onBack)
+        BasicText(title, style = TextStyle(color = colors.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -376,6 +417,10 @@ private fun libraryRows(
         shownPlaylists.forEach { add(PaletteRow.PlaylistRow(it)) }
     }
 }
+
+private fun childRows(children: List<PaletteCommand>, query: String): List<PaletteRow> =
+    children.filter { query.isBlank() || TextMatcher.matches(it.title, query) || it.keywords.any { keyword -> TextMatcher.matches(keyword, query) } }
+        .map(PaletteRow::CommandRow)
 
 private fun commandRows(commands: List<PaletteCommand>, query: String, sections: PaletteSections): List<PaletteRow> {
     val hits = if (query.isBlank()) commands else commands.filter { command ->

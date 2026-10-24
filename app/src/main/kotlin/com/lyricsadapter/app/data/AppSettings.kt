@@ -58,6 +58,13 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
     val activeSlot: Setting<SlotId> = enumSetting("activeSlot", SlotId.Local)
     val libraryLayout: Setting<LibraryLayout> = enumSetting("libraryMode", LibraryLayout.Wall)
 
+    /** Desktop's playlist overrides, hidden ones only: `source:id` of each playlist left out of the library. */
+    val hiddenPlaylists: Setting<Set<String>> = Setting(
+        prefs,
+        "hiddenPlaylists",
+        prefs.getString("hiddenPlaylists", null)?.split('\n')?.filterTo(mutableSetOf(), String::isNotEmpty).orEmpty(),
+    ) { it.joinToString("\n") }
+
     val focusBackgroundBlur = RangeSetting(prefs, "focusBgBlurRadius", 40..80, 80)
     val focusFontSize = RangeSetting(prefs, "focusLyricsFontSize", 24..40, 32)
     val focusLineSpacing = RangeSetting(prefs, "focusLyricLineSpacing", 12..48, 30)
