@@ -170,6 +170,7 @@
     <string name="qr_expired">二维码已失效</string>
     <string name="qr_logged_in">已登录</string>
     <string name="qr_error">加载失败，请重试</string>
+    <string name="qr_login_failed">登录失败，请重试</string>
     <string name="qr_refresh">刷新二维码</string>
     <string name="qr_save_to_gallery">保存二维码到相册</string>
     <string name="qr_saved_to_gallery">已保存到相册</string>

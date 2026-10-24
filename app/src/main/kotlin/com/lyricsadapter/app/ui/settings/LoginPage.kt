@@ -61,7 +61,8 @@ private sealed interface QrState {
     data class Showing(val image: CoverBytes, val confirming: Boolean) : QrState
     data object Expired : QrState
     data object Done : QrState
-    data class Failed(val message: String) : QrState
+    /** [afterScan]: the code was shown, so it is the login that failed, not loading the code. */
+    data class Failed(val message: String, val afterScan: Boolean = false) : QrState
 }
 
 /**
@@ -85,7 +86,7 @@ internal fun LoginPage(container: AppContainer, id: String, onDone: () -> Unit) 
         state = try {
             if (id == "qq") qqLogin(container, onShow = { state = it }) else neteaseLogin(container, onShow = { state = it })
         } catch (error: Exception) {
-            QrState.Failed(error.message ?: error.javaClass.simpleName)
+            QrState.Failed(error.message ?: error.javaClass.simpleName, afterScan = state is QrState.Showing)
         }
         if (state == QrState.Done) onDone()
     }
@@ -106,7 +107,7 @@ internal fun LoginPage(container: AppContainer, id: String, onDone: () -> Unit) 
             is QrState.Showing -> stringResource(if (current.confirming) R.string.qr_confirming else R.string.qr_waiting)
             QrState.Expired -> stringResource(R.string.qr_expired)
             QrState.Done -> stringResource(R.string.qr_logged_in)
-            is QrState.Failed -> stringResource(R.string.qr_error) + "（${current.message}）"
+            is QrState.Failed -> stringResource(if (current.afterScan) R.string.qr_login_failed else R.string.qr_error) + "（${current.message}）"
         }
         BasicText(message, style = TextStyle(color = colors.text, fontSize = 16.sp, textAlign = TextAlign.Center))
         Spacer(Modifier.height(16.dp))
@@ -142,12 +143,12 @@ private suspend fun qqLogin(container: AppContainer, onShow: (QrState) -> Unit):
             "confirming" -> onShow(QrState.Showing(image, confirming = true))
             "expired" -> return QrState.Expired
             "done" -> {
-                val cookie = poll.text("cookie") ?: return QrState.Failed("no cookie")
+                val cookie = poll.text("cookie") ?: return QrState.Failed("no cookie", afterScan = true)
                 val credential = poll["credential"]?.takeIf { it is JsonObject }?.toString()
                 container.plugins.saveLogin("qq", cookie, credential?.let { mapOf("credential" to it) }.orEmpty())
                 return QrState.Done
             }
-            else -> return QrState.Failed(poll.text("msg") ?: poll.text("error") ?: "login failed")
+            else -> return QrState.Failed(poll.text("msg") ?: poll.text("error") ?: "login failed", afterScan = true)
         }
     }
 }
@@ -168,11 +169,11 @@ private suspend fun neteaseLogin(container: AppContainer, onShow: (QrState) -> U
             802 -> onShow(QrState.Showing(image, confirming = true))
             800 -> return QrState.Expired
             803 -> {
-                val cookie = check.text("cookie") ?: return QrState.Failed("no cookie")
+                val cookie = check.text("cookie") ?: return QrState.Failed("no cookie", afterScan = true)
                 container.plugins.saveLogin("netease", cookie)
                 return QrState.Done
             }
-            else -> if (check.text("error") != null) return QrState.Failed(check.text("error").orEmpty())
+            else -> if (check.text("error") != null) return QrState.Failed(check.text("error").orEmpty(), afterScan = true)
         }
     }
 }

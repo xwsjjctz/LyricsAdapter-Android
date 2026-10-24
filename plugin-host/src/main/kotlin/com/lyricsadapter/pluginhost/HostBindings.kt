@@ -2,6 +2,7 @@ package com.lyricsadapter.pluginhost
 
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.define
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -89,6 +90,15 @@ internal class HostBindings(
                 }
             }
             return listOf(JSON.encodeToString(result.meta), result.body)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: FetchException) {
+            throw error
+        } catch (error: Exception) {
+            // Many I/O exceptions carry no message, which would reach the plugin as "fetch failed: ".
+            val reason = listOfNotNull(error.javaClass.simpleName, error.message?.takeIf(String::isNotBlank)).joinToString(": ")
+            environment.logger.log(pluginId, PluginLogLevel.WARN, "fetch ${meta.method} ${meta.url.substringBefore('?')} failed: $reason")
+            throw FetchException(reason)
         } finally {
             aborts.remove(requestId)
         }
