@@ -16,6 +16,7 @@ import kotlin.system.exitProcess
  *   smoke     automated checks against the live services (no login needed)
  *   qq-login  QR login for QQ Music, then search / stream / lyrics with it
  *   probe     search --source for --query and show which results stream without a login
+ *   translate the installed LLM translation plugin against a local stand-in model
  */
 fun main(args: Array<String>) {
     val options = SpikeOptions.parse(args.toList())
@@ -32,8 +33,9 @@ fun main(args: Array<String>) {
             "smoke" -> SmokeTest(loader, options).run()
             "qq-login" -> QqLogin(loader, store, options).run()
             "probe" -> Probe(loader, options).run()
+            "translate" -> Translate(options.pluginsDirectory, environment).run()
             else -> {
-                println("Unknown command: ${options.command}. Use smoke, qq-login or probe.")
+                println("Unknown command: ${options.command}. Use smoke, qq-login, probe or translate.")
                 false
             }
         }

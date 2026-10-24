@@ -9,6 +9,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -20,7 +23,12 @@ internal class HostBindings(
     private val pluginId: String,
     private val environment: PluginEnvironment,
     private val requests: PluginRequestQueue,
+    /** Only for platform plugins: their configuration, network permission and cache. */
+    private val platform: PlatformBindings? = null,
 ) {
+    /** What a platform plugin's context reads from the host. */
+    class PlatformBindings(val settings: PlatformPluginSettings, val cache: PluginCache)
+
     private val fetchBridge = FetchBridge(environment.transport)
     private val sleeps = ConcurrentHashMap<Long, CompletableDeferred<Unit>>()
     private val aborts = ConcurrentHashMap<Long, CompletableDeferred<Unit>>()
@@ -67,6 +75,12 @@ internal class HostBindings(
                 entries.keys.forEach(::secretName)
                 environment.store.writeSecrets(pluginId, entries)
             }
+            function("configuration") { JsonObject(platformBindings().settings.values()).toString() }
+            function("allowedOrigins") { JsonArray(platformBindings().settings.allowedOrigins().map(::JsonPrimitive)).toString() }
+            function("cacheGet") { args -> platformBindings().cache.get(args.string(0)) }
+            function("cacheSet") { args -> platformBindings().cache.set(args.string(0), args.stringOrNull(1)) }
+            function("cacheClear") { platformBindings().cache.clear() }
+
             function("readSetting") { args -> environment.store.readSetting(settingKey(args.string(0))) }
             function("writeSetting") { args -> environment.store.writeSetting(settingKey(args.string(0)), args.stringOrNull(1)) }
         }
@@ -113,6 +127,8 @@ internal class HostBindings(
             sleeps.remove(id, wake)
         }
     }
+
+    private fun platformBindings(): PlatformBindings = platform ?: throw IllegalStateException("Not a platform plugin")
 
     private fun secretName(name: String): String {
         require(NAME_PATTERN.matches(name)) { "Invalid plugin secret name" }

@@ -1,7 +1,8 @@
 /**
  * Prelude evaluated in each plugin's QuickJS runtime before the plugin code.
  * It installs the Node and web globals music plugins expect and exposes the
- * runtime controls as `__la`. The Kotlin host defines `__la_host` first.
+ * runtime controls as `__la` (legacy music plugins) and `__la_platform`
+ * (platform plugins). The Kotlin host defines `__la_host` first.
  */
 import { Buffer } from 'buffer';
 import URL from 'core-js-pure/stable/url/index.js';
@@ -13,6 +14,7 @@ import { createConsole } from './console.js';
 import { createCrypto } from './crypto.js';
 import { createFetch } from './fetch.js';
 import { createLegacyRuntime } from './legacyRuntime.js';
+import { createPlatformRuntime } from './platformRuntime.js';
 import { createRequire } from './modules.js';
 import { processShim } from './process.js';
 import { TextDecoder, TextEncoder } from './text.js';
@@ -58,3 +60,5 @@ Object.assign(target, {
 
 const requireModule = createRequire({ crypto, timers, TextEncoder, TextDecoder });
 target.__la = createLegacyRuntime({ pluginId: host.pluginId(), host, requireModule, format });
+// Plugins on desktop's platform API (`activate(context)`); the host picks one runtime per plugin.
+target.__la_platform = createPlatformRuntime({ pluginId: host.pluginId(), host, requireModule, format, abortApi, timers });

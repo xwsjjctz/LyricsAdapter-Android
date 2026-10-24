@@ -4327,7 +4327,7 @@
         };
         if (isCallable(nativeFetch)) {
           $({ global: true, enumerable: true, dontCallGetSet: true, forced: true }, {
-            fetch: function fetch2(input) {
+            fetch: function fetch3(input) {
               return nativeFetch(input, arguments.length > 1 ? wrapRequestOptions(arguments[1]) : {});
             }
           });
@@ -18857,7 +18857,7 @@
     const toHost = (buffer2) => new Int8Array(buffer2.buffer, buffer2.byteOffset, buffer2.byteLength);
     const fromHost = (bytes) => import_buffer4.Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let nextRequestId = 1;
-    async function fetch2(input, init = {}) {
+    async function fetch3(input, init = {}) {
       const url = requestUrl(input);
       const requestedMethod = String(init.method ?? input?.method ?? "GET");
       const method = NORMALIZED_METHODS.has(requestedMethod.toUpperCase()) ? requestedMethod.toUpperCase() : requestedMethod;
@@ -18891,7 +18891,7 @@
       response.type = "basic";
       return response;
     }
-    return { fetch: fetch2, Headers, Response };
+    return { fetch: fetch3, Headers, Response };
   }
 
   // src/legacyRuntime.js
@@ -18989,6 +18989,320 @@
     return { define, create, serve };
   }
 
+  // src/platformRuntime.js
+  init_inject();
+  var DATA_KEY = /^[a-z][a-z0-9-]{0,63}$/;
+  var DEFAULT_FETCH_TIMEOUT_MS = 2e4;
+  var MAX_FETCH_TIMEOUT_MS = 12e4;
+  var MAX_BODY_BYTES = 1e6;
+  var MAX_STORAGE_JSON = 65536;
+  var MAX_SECRET_LENGTH = 65536;
+  var MAX_CONCURRENT_CALLS = 4;
+  var EXTENSION_APIS = { "lyrics.translation": "1.2.0" };
+  var CORE_API = "1.1.0";
+  function describe2(error) {
+    if (error instanceof Error) return error.message || error.name;
+    return String(error);
+  }
+  function utf8Length(text) {
+    return new TextEncoder().encode(text).length;
+  }
+  function networkOrigin(value) {
+    try {
+      const url = new URL(value);
+      if (url.username || url.password) return void 0;
+      const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+      if (url.protocol === "https:" || url.protocol === "http:" && loopback) return url.origin;
+    } catch {
+    }
+    return void 0;
+  }
+  function createPlatformRuntime({ pluginId, host: host2, requireModule: requireModule2, format: format3, abortApi: abortApi2, timers: timers2 }) {
+    const { AbortController } = abortApi2;
+    const lifetime = new AbortController();
+    const providers = /* @__PURE__ */ new Map();
+    const subscriptions = [];
+    const configurationListeners = /* @__PURE__ */ new Set();
+    const calls = /* @__PURE__ */ new Map();
+    let moduleExports;
+    let manifest;
+    let activeCalls = 0;
+    const log = (level) => (...args) => host2.log(level, format3(...args));
+    const logger = { debug: log("debug"), info: log("info"), warn: log("warn"), error: log("error") };
+    const ensureLive = () => {
+      if (lifetime.signal.aborted) throw new Error("Plugin is inactive");
+    };
+    const dataKey = (key, area) => {
+      if (!DATA_KEY.test(String(key))) throw new Error("Invalid plugin data key");
+      return `plugin:${pluginId}:${area}:${key}`;
+    };
+    const disposable = (callback) => {
+      let disposed = false;
+      const item = { dispose: () => {
+        if (!disposed) {
+          disposed = true;
+          callback();
+        }
+      } };
+      subscriptions.push(item);
+      return item;
+    };
+    const release = (item) => {
+      try {
+        item.dispose();
+      } catch (error) {
+        logger.warn("Cleanup failed", error);
+      }
+    };
+    function withDeadline(work, signals, milliseconds) {
+      const controller = new AbortController();
+      const abort = (signal) => () => controller.abort(signal.reason ?? new Error("Plugin request cancelled"));
+      const listeners = signals.map((signal) => {
+        const listener = abort(signal);
+        if (signal.aborted) listener();
+        else signal.addEventListener("abort", listener, { once: true });
+        return [signal, listener];
+      });
+      const timer = timers2.setTimeout(() => controller.abort(new Error("Plugin request timed out")), milliseconds);
+      return new Promise((resolve, reject) => {
+        const cancelled = () => reject(controller.signal.reason);
+        controller.signal.addEventListener("abort", cancelled, { once: true });
+        if (controller.signal.aborted) cancelled();
+        else Promise.resolve().then(() => work(controller.signal)).then(resolve, reject);
+      }).finally(() => {
+        timers2.clearTimeout(timer);
+        listeners.forEach(([signal, listener]) => signal.removeEventListener("abort", listener));
+      });
+    }
+    const configuration = () => JSON.parse(host2.configuration());
+    async function fetchText(url, options = {}) {
+      ensureLive();
+      const origin = networkOrigin(String(url));
+      if (!origin || !JSON.parse(host2.allowedOrigins()).includes(origin)) throw new Error("Network origin is not declared");
+      if (options.method && !["GET", "POST"].includes(options.method)) throw new Error("Unsupported network method");
+      if (options.body !== void 0 && utf8Length(String(options.body)) > MAX_BODY_BYTES) throw new Error("Network request body exceeds 1 MiB");
+      const timeout = options.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
+      if (!Number.isInteger(timeout) || timeout < 1 || timeout > MAX_FETCH_TIMEOUT_MS) throw new Error("Network timeout must be 1-120000 ms");
+      const signals = [lifetime.signal, ...options.signal ? [options.signal] : []];
+      return withDeadline(async (signal) => {
+        const response = await fetch(String(url), {
+          redirect: "error",
+          signal,
+          ...options.method ? { method: options.method } : {},
+          ...options.headers ? { headers: options.headers } : {},
+          ...options.body !== void 0 ? { body: String(options.body) } : {}
+        });
+        const text = await response.text();
+        if (!response.ok) {
+          const detail = text.slice(0, 500).trim();
+          throw new Error(`Plugin network HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+        }
+        if (utf8Length(text) > MAX_BODY_BYTES) throw new Error("Network response exceeds 1 MiB");
+        return text;
+      }, signals, timeout);
+    }
+    function context() {
+      return {
+        pluginId,
+        apiVersions: { coreApi: CORE_API, extensionApis: negotiated(), legacyMusicApi: 1 },
+        signal: lifetime.signal,
+        subscriptions: new Proxy(subscriptions, {
+          get: (items, property, receiver) => property === "push" ? (...entries) => {
+            for (const entry of entries) {
+              if (!entry || typeof entry.dispose !== "function") throw new Error("Invalid plugin subscription");
+              if (lifetime.signal.aborted) release(entry);
+              else items.push(entry);
+            }
+            return items.length;
+          } : Reflect.get(items, property, receiver)
+        }),
+        logger,
+        extensions: {
+          register(type, id, provider) {
+            ensureLive();
+            if (!Object.hasOwn(negotiated(), type) || !manifest.contributes.providers.some((item) => item.type === type && item.id === id)) {
+              throw new Error("Provider is not declared or API is unavailable");
+            }
+            const key = `${type}:${id}`;
+            if (providers.has(key)) throw new Error("Provider is already registered");
+            if (typeof provider?.translate !== "function") throw new Error("Invalid translation provider");
+            providers.set(key, provider);
+            return disposable(() => providers.delete(key));
+          }
+        },
+        storage: {
+          get(key) {
+            ensureLive();
+            const value = host2.readSetting(dataKey(key, "storage"));
+            return value == null ? void 0 : JSON.parse(value);
+          },
+          set(key, value) {
+            ensureLive();
+            const json = JSON.stringify(value);
+            if (json === void 0 || json.length > MAX_STORAGE_JSON) throw new Error("Plugin storage value exceeds 64 KiB or is not JSON");
+            host2.writeSetting(dataKey(key, "storage"), json);
+          },
+          delete(key) {
+            ensureLive();
+            host2.writeSetting(dataKey(key, "storage"), null);
+          }
+        },
+        secrets: {
+          get(key) {
+            ensureLive();
+            dataKey(key, "secret");
+            if (manifest.permissions?.secrets !== "own") throw new Error("Plugin secrets permission is required");
+            return host2.readSecret(String(key));
+          },
+          set(key, value) {
+            ensureLive();
+            dataKey(key, "secret");
+            if (manifest.permissions?.secrets !== "own" || typeof value !== "string" || value.length > MAX_SECRET_LENGTH) {
+              throw new Error("Invalid plugin secret or missing permission");
+            }
+            host2.writeSecrets(JSON.stringify({ [key]: value }));
+          }
+        },
+        configuration: {
+          get(key) {
+            ensureLive();
+            const values = configuration();
+            if (!Object.hasOwn(values, key)) throw new Error("Unknown configuration key");
+            return values[key];
+          },
+          onDidChange(listener) {
+            ensureLive();
+            configurationListeners.add(listener);
+            return disposable(() => configurationListeners.delete(listener));
+          }
+        },
+        cache: {
+          async get(key) {
+            ensureLive();
+            const value = host2.cacheGet(String(key));
+            return value == null ? void 0 : JSON.parse(value);
+          },
+          async set(key, value) {
+            ensureLive();
+            const json = JSON.stringify(value);
+            if (json === void 0) throw new Error("Plugin cache value is not JSON");
+            host2.cacheSet(String(key), json);
+          },
+          async delete(key) {
+            ensureLive();
+            host2.cacheSet(String(key), null);
+          },
+          async clear() {
+            ensureLive();
+            host2.cacheClear();
+          }
+        },
+        network: { fetchText }
+      };
+    }
+    function negotiated() {
+      const versions = {};
+      for (const type of Object.keys({ ...manifest.extensionApis, ...manifest.optionalExtensionApis ?? {} })) {
+        if (EXTENSION_APIS[type]) versions[type] = EXTENSION_APIS[type];
+      }
+      return versions;
+    }
+    function define(factory) {
+      const module = { exports: {} };
+      factory.call(module.exports, module.exports, requireModule2, module, `/plugins/${pluginId}/index.cjs`, `/plugins/${pluginId}`);
+      moduleExports = module.exports;
+    }
+    async function activate(manifestJson) {
+      manifest = JSON.parse(manifestJson);
+      if (typeof moduleExports?.activate !== "function") throw new Error("Plugin must export activate(context)");
+      const result = await moduleExports.activate(context());
+      if (result) {
+        if (typeof result.dispose !== "function") throw new Error("activate must return void or a Disposable");
+        subscriptions.push(result);
+      }
+      for (const declaration of manifest.contributes.providers) {
+        if (negotiated()[declaration.type] && !providers.has(`${declaration.type}:${declaration.id}`)) {
+          throw new Error(`Provider was not registered: ${declaration.id}`);
+        }
+      }
+    }
+    async function translate({ requestId, providerId, request, timeoutMs }) {
+      ensureLive();
+      if (activeCalls >= MAX_CONCURRENT_CALLS) throw new Error("Plugin request concurrency limit reached");
+      const provider = providers.get(`lyrics.translation:${providerId}`);
+      if (!provider) throw new Error("Translation provider is unavailable");
+      const cancel = new AbortController();
+      calls.set(requestId, cancel);
+      activeCalls++;
+      const deadline = Date.now() + timeoutMs;
+      try {
+        return await withDeadline(
+          (signal) => provider.translate(request, { requestId, signal, timeoutMs: Math.max(0, deadline - Date.now()) }),
+          [cancel.signal, lifetime.signal],
+          timeoutMs
+        );
+      } finally {
+        activeCalls--;
+        calls.delete(requestId);
+      }
+    }
+    function configurationChanged() {
+      for (const listener of configurationListeners) {
+        try {
+          listener();
+        } catch (error) {
+          logger.warn("Configuration listener failed", error);
+        }
+      }
+    }
+    async function dispatch(operation, payload) {
+      switch (operation) {
+        case "activate":
+          return activate(payload.manifest);
+        case "translate":
+          return translate(payload);
+        case "cancel":
+          calls.get(payload.requestId)?.abort(new Error("Plugin request cancelled"));
+          return null;
+        case "configurationChanged":
+          configurationChanged();
+          return null;
+        default:
+          throw new Error(`Unknown plugin operation: ${operation}`);
+      }
+    }
+    function respond(id, value) {
+      let json;
+      try {
+        json = JSON.stringify(value === void 0 ? null : value);
+      } catch (error) {
+        host2.complete(id, false, describe2(error));
+        return;
+      }
+      host2.complete(id, true, json);
+    }
+    async function serve() {
+      for (; ; ) {
+        const request = await host2.nextRequest();
+        if (request == null) break;
+        const [id, operation, payloadJson] = request;
+        Promise.resolve().then(() => dispatch(operation, JSON.parse(payloadJson))).then((value) => respond(id, value), (error) => host2.complete(id, false, describe2(error))).catch((error) => host2.log("error", `Plugin response failed: ${describe2(error)}`));
+      }
+      lifetime.abort(new Error("Plugin is inactive"));
+      for (const item of subscriptions.splice(0).reverse()) release(item);
+      providers.clear();
+      configurationListeners.clear();
+      if (typeof moduleExports?.deactivate === "function") {
+        try {
+          await moduleExports.deactivate();
+        } catch (error) {
+          logger.warn("Deactivation failed", error);
+        }
+      }
+    }
+    return { define, activate, serve };
+  }
+
   // src/modules.js
   init_inject();
   var import_assert = __toESM(require_assert(), 1);
@@ -19013,7 +19327,7 @@
 
   // src/modules.js
   init_process();
-  function createRequire({ crypto: crypto2, timers: timers2, TextEncoder: TextEncoder2, TextDecoder: TextDecoder2 }) {
+  function createRequire({ crypto: crypto2, timers: timers2, TextEncoder: TextEncoder3, TextDecoder: TextDecoder2 }) {
     const modules = /* @__PURE__ */ new Map();
     const register = (name, value) => {
       modules.set(name, value);
@@ -19029,7 +19343,7 @@
     register("string_decoder", import_string_decoder.default);
     register("timers", timers2);
     register("url", { URL: globalThis.URL, URLSearchParams: globalThis.URLSearchParams });
-    register("util", { ...import_util2.default, TextEncoder: TextEncoder2, TextDecoder: TextDecoder2 });
+    register("util", { ...import_util2.default, TextEncoder: TextEncoder3, TextDecoder: TextDecoder2 });
     register("zlib", import_zlib.default);
     return function requireModule2(name) {
       const key = String(name);
@@ -19058,7 +19372,7 @@
     if (ArrayBuffer.isView(input)) return import_buffer6.Buffer.from(input.buffer, input.byteOffset, input.byteLength);
     throw new TypeError('The "input" argument must be an instance of ArrayBuffer or ArrayBufferView');
   }
-  var TextEncoder = class {
+  var TextEncoder2 = class {
     get encoding() {
       return "utf-8";
     }
@@ -19189,18 +19503,18 @@
   var timers = createTimers(host, (error) => console2.error("Uncaught error in timer callback:", error));
   var abortApi = createAbortApi(timers);
   var crypto = createCrypto(host);
-  var { fetch, Headers: Headers2, Response: Response2 } = createFetch(host, abortApi);
+  var { fetch: fetch2, Headers: Headers2, Response: Response2 } = createFetch(host, abortApi);
   Object.assign(target, {
     global: target,
     process: processShim,
     Buffer: import_buffer7.Buffer,
     URL: import_url.default,
     URLSearchParams: import_url_search_params.default,
-    TextEncoder,
+    TextEncoder: TextEncoder2,
     TextDecoder,
     Blob,
     console: console2,
-    fetch,
+    fetch: fetch2,
     Headers: Headers2,
     Response: Response2,
     AbortController: abortApi.AbortController,
@@ -19216,8 +19530,9 @@
     btoa: (data) => import_buffer7.Buffer.from(String(data), "latin1").toString("base64"),
     ...timers
   });
-  var requireModule = createRequire({ crypto, timers, TextEncoder, TextDecoder });
+  var requireModule = createRequire({ crypto, timers, TextEncoder: TextEncoder2, TextDecoder });
   target.__la = createLegacyRuntime({ pluginId: host.pluginId(), host, requireModule, format: import_util3.format });
+  target.__la_platform = createPlatformRuntime({ pluginId: host.pluginId(), host, requireModule, format: import_util3.format, abortApi, timers });
 })();
 /*! Bundled license information:
 
