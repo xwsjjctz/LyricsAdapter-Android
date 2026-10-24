@@ -4,15 +4,28 @@ package com.lyricsadapter.library.wall
 data class WallSlot(val x: Int, val y: Int, val cols: Int, val rows: Int)
 
 /**
- * Desktop's narrow poster wall (`wallLayout.ts`, below 720 px): 6 columns
+ * Desktop's poster wall (`wallLayout.ts`). Below 720 px it has 6 columns
  * filled from 8-row blocks whose seven covers tile the block exactly, every
  * second block mirrored. A last block with fewer songs uses a tail shaped
  * for its count, and a single song gets one small square. Slots follow list
  * order, so playing a song never moves it and adding songs only reshapes the end.
+ * Wider, it has as many columns as fit about one small cover per 200 px and
+ * is packed in bands by [WallPacker].
  */
 object WallLayout {
     const val COLUMNS = 6
     const val BLOCK_ROWS = 8
+
+    /** Desktop's `WALL_COMPACT_BREAKPOINT` and `WALL_TARGET_UNIT`, in dp. */
+    private const val COMPACT_BREAKPOINT = 720f
+    private const val TARGET_UNIT = 200f
+
+    /** Desktop's `wallColumnsFor`: 6 when narrow, otherwise two per small cover that fits. */
+    fun columnsFor(width: Float): Int =
+        if (width < COMPACT_BREAKPOINT) COLUMNS else Math.round(width / TARGET_UNIT) * WallPacker.CELLS_PER_UNIT
+
+    /** Rows per block (narrow) or band (wide): the wall is laid out, and scrolled, in these. */
+    fun blockRows(columns: Int): Int = if (columns == COLUMNS) BLOCK_ROWS else WallPacker.BAND_ROWS
 
     private val TEMPLATE = listOf(
         WallSlot(0, 0, 2, 2), WallSlot(2, 0, 2, 2), WallSlot(4, 0, 2, 4),
@@ -33,9 +46,10 @@ object WallLayout {
 
     private val READING_ORDER = compareBy<WallSlot>({ it.y }, { it.x })
 
-    /** One slot per song, in list order. */
-    fun slots(count: Int): List<WallSlot> {
+    /** One slot per song, in list order, for a wall [columns] wide. */
+    fun slots(count: Int, columns: Int = COLUMNS): List<WallSlot> {
         if (count <= 0) return emptyList()
+        if (columns != COLUMNS) return WallPacker.pack(count, columns / WallPacker.CELLS_PER_UNIT)
         if (count == 1) return listOf(WallSlot(0, 0, 2, 2))
         val slots = ArrayList<WallSlot>(count)
         var block = 0

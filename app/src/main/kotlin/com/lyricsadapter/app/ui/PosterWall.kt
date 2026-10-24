@@ -57,8 +57,8 @@ import kotlin.math.roundToInt
 private class WallBlock(val index: Int, val rows: Int, val tiles: List<Pair<Int, WallSlot>>)
 
 /** The list item that holds song [trackIndex], for locating the current song. */
-fun wallBlockOf(trackIndex: Int, count: Int): Int =
-    WallLayout.slots(count).getOrNull(trackIndex)?.let { it.y / WallLayout.BLOCK_ROWS } ?: 0
+fun wallBlockOf(trackIndex: Int, count: Int, columns: Int): Int =
+    WallLayout.slots(count, columns).getOrNull(trackIndex)?.let { it.y / WallLayout.blockRows(columns) } ?: 0
 
 /**
  * Desktop's poster wall on a phone: covers edge to edge in desktop's narrow
@@ -73,16 +73,18 @@ fun PosterWall(
     currentId: String?,
     selection: Set<String>?,
     downloads: Map<String, Float>,
+    columns: Int,
     listState: LazyListState,
     contentPadding: PaddingValues,
     onClick: (index: Int) -> Unit,
     onLongPress: (Track, IntOffset) -> Unit,
 ) {
-    val blocks = remember(tracks.size) {
-        WallLayout.slots(tracks.size).withIndex()
-            .groupBy { it.value.y / WallLayout.BLOCK_ROWS }
+    val blocks = remember(tracks.size, columns) {
+        val rows = WallLayout.blockRows(columns)
+        WallLayout.slots(tracks.size, columns).withIndex()
+            .groupBy { it.value.y / rows }
             .map { (block, slots) ->
-                val tiles = slots.map { (index, slot) -> index to slot.copy(y = slot.y - block * WallLayout.BLOCK_ROWS) }
+                val tiles = slots.map { (index, slot) -> index to slot.copy(y = slot.y - block * rows) }
                 WallBlock(block, tiles.maxOf { (_, slot) -> slot.y + slot.rows }, tiles)
             }
     }
@@ -105,7 +107,7 @@ fun PosterWall(
                     }
                 },
             ) { measurables, constraints ->
-                val cell = constraints.maxWidth / WallLayout.COLUMNS.toFloat()
+                val cell = constraints.maxWidth / columns.toFloat()
                 val placed = measurables.map { measurable ->
                     val slot = block.tiles.first { it.first == measurable.layoutId }.second
                     // Snap both edges to whole pixels, so neighbouring covers meet without seams.

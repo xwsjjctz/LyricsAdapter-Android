@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -43,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
+import com.lyricsadapter.library.wall.WallLayout
 import com.lyricsadapter.app.plugins.DownloadOutcome
 import com.lyricsadapter.app.plugins.DownloadQuality
 import com.lyricsadapter.app.data.CloudStatus
@@ -95,6 +97,7 @@ fun AppScreen(container: AppContainer) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val wallColumns = WallLayout.columnsFor(LocalConfiguration.current.screenWidthDp.toFloat())
 
     var focusOpen by rememberSaveable { mutableStateOf(false) }
     var palette by rememberSaveable { mutableStateOf<PaletteMode?>(null) }
@@ -180,7 +183,7 @@ fun AppScreen(container: AppContainer) {
             locateCurrent = {
                 switchSlot(SlotId.Local)
                 val index = localTracks.indexOf(current)
-                val item = if (layout == LibraryLayout.Wall) wallBlockOf(index, localTracks.size) else index
+                val item = if (layout == LibraryLayout.Wall) wallBlockOf(index, localTracks.size, wallColumns) else index
                 if (index >= 0) scope.launch { listState.animateScrollToItem(item) }
             },
             openFocus = { focusOpen = true },
@@ -220,6 +223,7 @@ fun AppScreen(container: AppContainer) {
             ),
             selection = selection,
             downloads = downloads,
+            wallColumns = wallColumns,
             onSelectionChange = { selection = it },
             actions = LibraryActions(
                 onPlay = { index -> player.play(slotTracks, index) },

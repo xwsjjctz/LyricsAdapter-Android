@@ -6,8 +6,15 @@ import androidx.compose.runtime.setValue
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-/** Where the sung item's top sits, as a fraction of the view's height (desktop's portrait `alignPosition`). */
-internal const val ANCHOR_FRACTION = 0.1f
+/**
+ * Where the sung item sits: desktop's `alignAnchor` and `alignPosition`. In
+ * portrait its top is a tenth of the way down; in landscape its middle is at
+ * 35 % of the height.
+ */
+enum class LyricsAnchor(val position: Float, val centred: Boolean) {
+    Top(0.1f, centred = false),
+    Centre(0.35f, centred = true),
+}
 
 private const val STIFFNESS = 110f
 private const val DAMPING_RATIO = 0.9f
@@ -27,9 +34,10 @@ private const val MAX_STEP_SECONDS = 1f / 240
  * advance once per frame in [step]; layers read them through [shift], which
  * redraws them without recomposing or measuring again.
  */
-internal class LyricsScroller {
-    /** Item tops and the view height from the latest measure pass. */
+internal class LyricsScroller(private val anchor: LyricsAnchor) {
+    /** Item tops and heights, and the view height, from the latest measure pass. */
     var tops: IntArray = IntArray(0)
+    var heights: IntArray = IntArray(0)
     var viewportHeight: Int = 0
 
     private var shifts = FloatArray(0)
@@ -45,7 +53,11 @@ internal class LyricsScroller {
     }
 
     /** The shift that puts [active] at the anchor; before the first item, the first one. */
-    fun targetShift(active: Int): Float = viewportHeight * ANCHOR_FRACTION - tops.getOrElse(active.coerceAtLeast(0)) { 0 }
+    fun targetShift(active: Int): Float {
+        val index = active.coerceAtLeast(0)
+        val middle = if (anchor.centred) heights.getOrElse(index) { 0 } / 2f else 0f
+        return viewportHeight * anchor.position - tops.getOrElse(index) { 0 } - middle
+    }
 
     fun step(frameNanos: Long, active: Int) {
         val count = tops.size

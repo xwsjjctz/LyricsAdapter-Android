@@ -102,6 +102,7 @@ fun LibraryScreen(
     contentPadding: PaddingValues,
     selection: Set<String>?,
     downloads: Map<String, Float>,
+    wallColumns: Int,
     onSelectionChange: (Set<String>?) -> Unit,
     actions: LibraryActions,
     empty: EmptyContent,
@@ -127,6 +128,7 @@ fun LibraryScreen(
                     currentId = currentId,
                     selection = selection,
                     downloads = downloads,
+                    columns = wallColumns,
                     listState = listState,
                     contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp),
                     onClick = { index ->

@@ -106,6 +106,7 @@ fun LyricsView(
     controlsHeight: Dp = 0.dp,
     controlsShown: () -> Float = { 0f },
     settings: FocusSettings = FocusSettings(),
+    anchor: LyricsAnchor = LyricsAnchor.Top,
     onScrollingChange: (Boolean) -> Unit = {},
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
@@ -114,7 +115,7 @@ fun LyricsView(
     val gap = (settings.fontSize * 0.38f + (settings.lineSpacing - 24) / 2f).dp
     val blurStrength = settings.inactiveBlur / DEFAULT_INACTIVE_BLUR
     val active by remember(items) { derivedStateOf { items.activeItemAt(position()) } }
-    val scroller = remember(items) { LyricsScroller() }
+    val scroller = remember(items, anchor) { LyricsScroller(anchor) }
     val measurer = rememberTextMeasurer()
     val scope = rememberCoroutineScope()
     // The manual scroll on top of the song-driven one; zero while following the song.
@@ -204,6 +205,7 @@ fun LyricsView(
         }
         val height = constraints.maxHeight
         scroller.tops = tops
+        scroller.heights = IntArray(placeables.size) { placeables[it].height }
         scroller.viewportHeight = height
         layout(constraints.maxWidth, height) {
             placeables.forEachIndexed { index, placeable ->
