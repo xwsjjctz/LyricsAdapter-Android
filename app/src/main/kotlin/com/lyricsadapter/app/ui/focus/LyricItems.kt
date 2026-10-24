@@ -2,8 +2,11 @@ package com.lyricsadapter.app.ui.focus
 
 import com.lyricsadapter.lyrics.LyricLine
 
-/** A gap at least this long between sung lines shows the interlude dots. */
+/** An intro at least this long shows the interlude dots. */
 private const val INTERLUDE_MIN_MS = 4_000L
+
+/** The dots finish this long before the first line starts. */
+private const val INTERLUDE_LEAD_MS = 250L
 
 /** What the lyrics column lists: sung lines and the instrumental gaps between them. */
 internal sealed interface LyricItem {
@@ -23,16 +26,16 @@ internal data class InterludeItem(override val startMs: Long, val endMs: Long, v
 }
 
 /**
- * Lines in order, with a gap before the first line when the intro is long
- * and between word-timed lines when the singing stops long enough. Line-timed
- * lyrics have no end times, so only their intro can become a gap.
+ * Lines in order, with a gap before the first line when the intro is long.
+ * As on desktop, a line stays the sung one until the next line starts, so
+ * instrumental breaks between lines keep the last line lit instead of
+ * showing dots (desktop gives each line the next one's start as its end).
  */
 internal fun buildLyricItems(lines: List<LyricLine>): List<LyricItem> = buildList {
-    lines.forEachIndexed { index, line ->
-        val gapStart = if (index == 0) 0L else lines[index - 1].words.lastOrNull()?.endMs
-        if (gapStart != null && line.startMs - gapStart >= INTERLUDE_MIN_MS) add(InterludeItem(gapStart, line.startMs, index))
-        add(LineItem(line, index))
-    }
+    val first = lines.firstOrNull() ?: return@buildList
+    val introEnd = first.startMs - INTERLUDE_LEAD_MS
+    if (introEnd >= INTERLUDE_MIN_MS) add(InterludeItem(0L, introEnd, 0))
+    lines.forEachIndexed { index, line -> add(LineItem(line, index)) }
 }
 
 /** The item being sung at [positionMs]: the last one that has started, or -1 before the first. */

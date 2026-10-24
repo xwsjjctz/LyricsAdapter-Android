@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -55,14 +56,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Desktop's lyric type (`FocusAmlLyrics.css`): tight lines and tracking. */
-private const val LINE_HEIGHT = 1.12f
+/** Desktop's lyric type, as its focus mode computes it: 1.2em lines and tight tracking. */
+private const val LINE_HEIGHT = 1.2f
 private const val LETTER_SPACING = -0.025f
 
 /** The lyrics' side margins; desktop's portrait text starts 40px in on a 402px-wide window. */
 private val LINE_PADDING = 36.dp
 
-/** Desktop's blur, measured on its focus mode: 0.8px per line of distance, two more above the sung line, never past 5px. */
+/** Desktop's blur, measured on its focus mode: 0.8px per line of distance plus one line below the sung one and two above, never past 5px. */
 private const val BLUR_PER_LINE = 0.8f
 private const val MAX_BLUR = 5f
 
@@ -79,7 +80,7 @@ private fun lineStyle(fontSize: Int) = TextStyle(
 
 /** The blur of a line [distance] lines from the sung one (negative above it). */
 private fun lineBlur(distance: Float, strength: Float): Float {
-    val lines = if (distance < 0) -distance + 2 else distance
+    val lines = if (distance < 0) -distance + 2 else distance + 1
     return (lines * BLUR_PER_LINE).coerceAtMost(MAX_BLUR) * strength
 }
 
@@ -111,12 +112,18 @@ fun LyricsView(
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
     val style = remember(settings.fontSize) { lineStyle(settings.fontSize) }
-    // Desktop's `padding-block: calc(0.38em + (lineSpacing - 24px) / 2)`.
-    val gap = (settings.fontSize * 0.38f + (settings.lineSpacing - 24) / 2f).dp
+    val measurer = rememberTextMeasurer()
+    // Desktop's `padding-block: calc(0.38em + (lineSpacing - 24px) / 2)` around lines exactly the line
+    // height tall. Compose keeps a text's first and last line at the font's natural height (about
+    // 1.45em for CJK), so the padding gives that extra back.
+    val density = LocalDensity.current
+    val overhang = remember(style, measurer, density) {
+        with(density) { ((measurer.measure("中", style).size.height - style.lineHeight.toPx()) / 2).toDp() }
+    }
+    val gap = ((settings.fontSize * 0.38f + (settings.lineSpacing - 24) / 2f).dp - overhang).coerceAtLeast(0.dp)
     val blurStrength = settings.inactiveBlur / DEFAULT_INACTIVE_BLUR
     val active by remember(items) { derivedStateOf { items.activeItemAt(position()) } }
     val scroller = remember(items, anchor) { LyricsScroller(anchor) }
-    val measurer = rememberTextMeasurer()
     val scope = rememberCoroutineScope()
     // The manual scroll on top of the song-driven one; zero while following the song.
     var browse by remember(items) { mutableFloatStateOf(0f) }

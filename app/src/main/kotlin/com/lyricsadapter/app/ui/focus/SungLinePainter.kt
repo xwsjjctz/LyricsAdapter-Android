@@ -26,14 +26,17 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /*
- * Desktop's alphas, as its focus mode renders them: every line not being sung is at 0.2. The sung line's words
- * rise to 0.96 once sung, and those still to come to 0.4; a line without word
- * timing lights as a whole, at 0.85.
+ * Desktop's alphas, as its focus mode renders them: text is white at 0.96;
+ * every line not being sung is at a fifth of that. The sung line as a whole is
+ * at 0.85, and within it words still to come are at 0.4, so they show at about
+ * a third and sung words at about four fifths.
  */
-internal val INACTIVE = Color.White.copy(alpha = 0.2f)
-private val SUNG = Color.White.copy(alpha = 0.96f)
-private val UPCOMING = Color.White.copy(alpha = 0.4f)
-private val WHOLE_LINE = Color.White.copy(alpha = 0.96f * 0.85f)
+private const val TEXT_ALPHA = 0.96f
+private const val SUNG_LINE_ALPHA = 0.85f
+internal val INACTIVE = Color.White.copy(alpha = TEXT_ALPHA * 0.2f)
+private val SUNG = Color.White.copy(alpha = TEXT_ALPHA * SUNG_LINE_ALPHA)
+private val UPCOMING = Color.White.copy(alpha = TEXT_ALPHA * SUNG_LINE_ALPHA * 0.4f)
+private val WHOLE_LINE = SUNG
 
 /** How far a sung word rises. */
 private val LIFT = 3.dp
