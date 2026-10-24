@@ -251,7 +251,7 @@ private fun LyricLineText(
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0.5f)
-                val radius = blur.dp.toPx()
+                val radius = cssBlurRadius(blur.dp.toPx())
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
             }
             .drawWithContent {
@@ -259,6 +259,12 @@ private fun LyricLineText(
             },
     )
 }
+
+/**
+ * The [BlurEffect] radius that blurs as much as CSS `blur(sigma)`: CSS takes
+ * the Gaussian's deviation, Android a radius it turns into `0.57735 r + 0.5`.
+ */
+private fun cssBlurRadius(sigma: Float): Float = ((sigma - 0.5f) / 0.57735f).coerceAtLeast(0f)
 
 /** Desktop's `--focus-lyrics-edge-fade` and portrait bottom fade, each at most a quarter of the view. */
 private val TOP_FADE = 72.dp

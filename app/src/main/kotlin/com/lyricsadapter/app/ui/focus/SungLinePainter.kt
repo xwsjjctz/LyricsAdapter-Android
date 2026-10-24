@@ -111,7 +111,8 @@ internal class SungLinePainter(
         translate(top = -LIFT.toPx() * emphasis * rise) {
             val glow = if (glows(word.durationMs, word.text)) sin(PI.toFloat() * progress) * emphasis else 0f
             if (glow > 0.01f && Build.VERSION.SDK_INT >= 31) drawGlow(layout, index, bounds, glow)
-            clipPath(path) { drawText(layout, brush = sweep) }
+            // Without an explicit alpha the paint keeps the last colour's, and the gradient is dimmed twice.
+            clipPath(path) { drawText(layout, brush = sweep, alpha = 1f) }
         }
     }
 
@@ -137,7 +138,45 @@ internal class SungLinePainter(
     private fun startOf(index: Int): Int = if (index == 0) 0 else wordEnds[index - 1]
 
     private fun range(start: Int, end: Int): Pair<Path, Rect> = paths.getOrPut(start.toLong() shl 32 or end.toLong()) {
-        val path = layout!!.getPathForRange(start, end)
-        path to path.getBounds()
+        val path = Path()
+        rangeRects(layout!!, start, end, OVERHANG).forEach(path::addRect)
+        // The sweep and glow follow the glyphs, not the widened clip.
+        val bounds = rangeRects(layout!!, start, end, overhang = 0f).reduce { union, rect ->
+            Rect(minOf(union.left, rect.left), minOf(union.top, rect.top), maxOf(union.right, rect.right), maxOf(union.bottom, rect.bottom))
+        }
+        path to bounds
     }
+}
+
+/** Where one line's band ends, as a share of the way to the next baseline: below CJK and Latin descenders, above the next line's glyphs. */
+private const val BAND_SPLIT = 0.2f
+
+/** How far a range's band reaches past the line's ends, for glyphs that overhang their advance. */
+private const val OVERHANG = 1_000f
+
+/**
+ * One rectangle per visual line of [start] until [end]. The line boxes that
+ * `getPathForRange` uses cut glyphs at tight line heights, so a lifted word
+ * would leave a slice behind; these bands meet a fifth of the way between
+ * baselines instead, and the first and last lines stay open above and below.
+ */
+private fun rangeRects(layout: TextLayoutResult, start: Int, end: Int, overhang: Float): List<Rect> {
+    if (start >= end) return listOf(Rect.Zero)
+    val first = layout.getLineForOffset(start)
+    val last = layout.getLineForOffset(end - 1)
+    return (first..last).map { line ->
+        val lineStart = layout.getLineStart(line)
+        val lineEnd = layout.getLineEnd(line)
+        val left = if (start > lineStart) layout.getHorizontalPosition(start, true) else layout.getLineLeft(line) - overhang
+        val right = if (end < lineEnd) layout.getHorizontalPosition(end, true) else layout.getLineRight(line) + overhang
+        val top = if (line == 0) -overhang else split(layout, line - 1)
+        val bottom = if (line == layout.lineCount - 1) layout.size.height + overhang else split(layout, line)
+        Rect(left, top, right, bottom)
+    }
+}
+
+/** The boundary between [line] and the line after it. */
+private fun split(layout: TextLayoutResult, line: Int): Float {
+    val baseline = layout.getLineBaseline(line)
+    return baseline + (layout.getLineBaseline(line + 1) - baseline) * BAND_SPLIT
 }
