@@ -30,6 +30,9 @@ data class OnlineSong(
 data class OnlinePlaylist(val source: String, val id: String, val name: String, val coverUrl: String?, val songCount: Int)
 
 /** Desktop's `OnlineLyricsResult`: LRC or plain text, with an optional word-timed payload. */
+/** A playable URL, the headers to fetch it with, and the quality the source actually served. */
+data class ResolvedStream(val url: String, val headers: Map<String, String>, val quality: String)
+
 data class OnlineLyrics(val lyrics: String, val wordLyrics: String?, val wordLyricsFormat: String?)
 
 /** A source refused or could not answer, with its message for people. */
@@ -91,7 +94,7 @@ class MusicSources(private val registry: PluginRegistry) {
      * protocol resolves it: refuse when the source needs a login that is
      * missing, and fall back to lower qualities.
      */
-    suspend fun stream(source: String, songmid: String, mediaMid: String?, quality: String = "320"): Pair<String, Map<String, String>> {
+    suspend fun stream(source: String, songmid: String, mediaMid: String?, quality: String = "320"): ResolvedStream {
         val plugin = registry.runtime(source)
         val cookie = registry.cookie(source)
         if (cookie.isEmpty() && plugin.requiresCookie()) throw MusicSourceException("请先登录音乐源")
@@ -103,8 +106,10 @@ class MusicSources(private val registry: PluginRegistry) {
                     add(candidate)
                     if (mediaMid != null) add(mediaMid)
                 }
-                val url = ((plugin.call("getMusicUrl", args) as? JsonObject)?.text("url"))
-                if (!url.isNullOrEmpty()) return url to plugin.streamHeaders(cookie)
+                val result = plugin.call("getMusicUrl", args) as? JsonObject
+                val url = result?.text("url")
+                // Sources report what they served, which can be lower than asked.
+                if (!url.isNullOrEmpty()) return ResolvedStream(url, plugin.streamHeaders(cookie), result.text("quality") ?: candidate)
             } catch (error: Exception) {
                 failure = error
             }

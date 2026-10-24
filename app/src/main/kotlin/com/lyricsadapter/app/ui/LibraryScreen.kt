@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.plugins.DownloadQuality
 import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.library.Track
@@ -74,6 +75,8 @@ class LibraryActions(
     val onPlay: (index: Int) -> Unit,
     val onEdit: (Track) -> Unit,
     val onRemove: (Set<String>) -> Unit,
+    /** Online songs only; null where the list has none. */
+    val onDownload: ((Track, DownloadQuality) -> Unit)?,
     val onSwitchSlot: (SlotId) -> Unit,
     val onSearch: () -> Unit,
 )
@@ -98,6 +101,7 @@ fun LibraryScreen(
     listState: LazyListState,
     contentPadding: PaddingValues,
     selection: Set<String>?,
+    downloads: Map<String, Float>,
     onSelectionChange: (Set<String>?) -> Unit,
     actions: LibraryActions,
     empty: EmptyContent,
@@ -122,6 +126,7 @@ fun LibraryScreen(
                     tracks = tracks,
                     currentId = currentId,
                     selection = selection,
+                    downloads = downloads,
                     listState = listState,
                     contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp),
                     onClick = { index ->
@@ -140,6 +145,7 @@ fun LibraryScreen(
                             track = track,
                             playing = track.id == currentId,
                             selected = selection?.let { track.id in it },
+                            download = downloads[track.id],
                             onClick = {
                                 if (selection != null) onSelectionChange(selection.toggle(track.id)) else actions.onPlay(index)
                             },
@@ -162,10 +168,19 @@ fun LibraryScreen(
         ContextMenu(
             anchor = anchor,
             entries = buildList {
-                if (editable) add(MenuEntry.Item(stringResource(R.string.edit_info), R.drawable.ui_edit) { actions.onEdit(track) })
-                add(MenuEntry.Item(stringResource(R.string.select_multiple), R.drawable.ui_checklist) { onSelectionChange(setOf(track.id)) })
-                add(MenuEntry.Separator)
-                add(MenuEntry.Item(stringResource(R.string.remove_from_library), R.drawable.ui_delete, danger = true) { pendingRemoval = setOf(track.id) })
+                // Desktop's `buildTrackMenuItems`: download first, for online songs outside the local and cloud slots.
+                val download = actions.onDownload
+                if (download != null && slot != SlotId.Local && slot != SlotId.Cloud) {
+                    add(MenuEntry.Label(stringResource(R.string.track_download)))
+                    DownloadQuality.entries.forEach { quality -> add(MenuEntry.Item(quality.label, R.drawable.ui_download) { download(track, quality) }) }
+                }
+                if (slot.isManaged) {
+                    if (isNotEmpty()) add(MenuEntry.Separator)
+                    if (editable) add(MenuEntry.Item(stringResource(R.string.edit_info), R.drawable.ui_edit) { actions.onEdit(track) })
+                    add(MenuEntry.Item(stringResource(R.string.select_multiple), R.drawable.ui_checklist) { onSelectionChange(setOf(track.id)) })
+                    add(MenuEntry.Separator)
+                    add(MenuEntry.Item(stringResource(R.string.remove_from_library), R.drawable.ui_delete, danger = true) { pendingRemoval = setOf(track.id) })
+                }
             },
             onDismiss = { menu = null },
         )
@@ -187,7 +202,10 @@ fun LibraryScreen(
 }
 
 /** Local and online-queue lists are managed in the app; other slots are play-only (desktop's `buildTrackMenuItems`). */
-private val SlotId.hasTrackMenu: Boolean get() = this == SlotId.Local || this == SlotId.Online
+private val SlotId.isManaged: Boolean get() = this == SlotId.Local || this == SlotId.Online
+
+/** Managed lists have a song menu, and so do online playlists, for downloading. */
+private val SlotId.hasTrackMenu: Boolean get() = isManaged || this == SlotId.Playlist
 
 private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
 
@@ -276,7 +294,7 @@ private fun SelectionBar(count: Int, onRemove: () -> Unit, modifier: Modifier = 
 }
 
 @Composable
-private fun TrackRow(track: Track, playing: Boolean, selected: Boolean?, onClick: () -> Unit, onLongPress: (IntOffset) -> Unit) {
+private fun TrackRow(track: Track, playing: Boolean, selected: Boolean?, download: Float?, onClick: () -> Unit, onLongPress: (IntOffset) -> Unit) {
     val colors = LocalAppColors.current
     val filled = playing && selected == null
     val textColor = if (filled) colors.onAccent else colors.text
@@ -329,7 +347,11 @@ private fun TrackRow(track: Track, playing: Boolean, selected: Boolean?, onClick
             )
         }
         Spacer(Modifier.width(12.dp))
-        BasicText(formatDuration(track.durationMs), style = TextStyle(color = secondaryColor, fontSize = 13.sp))
+        if (download != null) {
+            DownloadBadge(download, compact = true)
+        } else {
+            BasicText(formatDuration(track.durationMs), style = TextStyle(color = secondaryColor, fontSize = 13.sp))
+        }
     }
 }
 

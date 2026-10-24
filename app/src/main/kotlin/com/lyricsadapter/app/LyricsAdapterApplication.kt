@@ -12,6 +12,7 @@ import com.lyricsadapter.app.data.TrackReader
 import com.lyricsadapter.app.playback.PlayerConnection
 import com.lyricsadapter.app.plugins.AndroidPluginStore
 import com.lyricsadapter.app.plugins.MusicSources
+import com.lyricsadapter.app.plugins.OnlineDownloads
 import com.lyricsadapter.app.plugins.OnlineLibrary
 import com.lyricsadapter.app.plugins.PluginCatalog
 import com.lyricsadapter.app.plugins.PluginRegistry
@@ -51,6 +52,7 @@ class AppContainer(context: Context) {
     val catalog = PluginCatalog(plugins)
     val sources = MusicSources(plugins)
     val online = OnlineLibrary(sources, File(context.filesDir, "online-library.json"), scope)
+    val downloads = OnlineDownloads(context.contentResolver, sources, library, File(context.cacheDir, "downloads"), scope)
     val player = PlayerConnection(context)
     val volume = SystemVolume(context)
 }

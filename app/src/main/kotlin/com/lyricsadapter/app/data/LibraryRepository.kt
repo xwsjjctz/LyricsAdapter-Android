@@ -3,6 +3,7 @@ package com.lyricsadapter.app.data
 import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Log
 import com.lyricsadapter.audiotags.CoverImage
 import com.lyricsadapter.audiotags.CoverUpdate
@@ -111,6 +112,8 @@ class LibraryRepository(
     }
 
     private fun persistAccess(uri: Uri) {
+        // Songs the app saved itself (downloads) are its own; MediaStore grants nothing to persist.
+        if (uri.authority == MediaStore.AUTHORITY) return
         val readWrite = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         try {
             resolver.takePersistableUriPermission(uri, readWrite)

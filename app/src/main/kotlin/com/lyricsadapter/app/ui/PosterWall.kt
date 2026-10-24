@@ -72,6 +72,7 @@ fun PosterWall(
     tracks: List<Track>,
     currentId: String?,
     selection: Set<String>?,
+    downloads: Map<String, Float>,
     listState: LazyListState,
     contentPadding: PaddingValues,
     onClick: (index: Int) -> Unit,
@@ -96,6 +97,7 @@ fun PosterWall(
                             slot = slot,
                             current = track.id == currentId,
                             selected = selection?.let { track.id in it },
+                            download = downloads[track.id],
                             onClick = { onClick(index) },
                             onLongPress = { anchor -> onLongPress(track, anchor) },
                             modifier = Modifier.layoutId(index),
@@ -130,6 +132,7 @@ private fun PosterTile(
     slot: WallSlot,
     current: Boolean,
     selected: Boolean?,
+    download: Float?,
     onClick: () -> Unit,
     onLongPress: (IntOffset) -> Unit,
     modifier: Modifier = Modifier,
@@ -200,5 +203,7 @@ private fun PosterTile(
         if (current && selected == null) {
             Box(Modifier.fillMaxSize().border(3.dp, colors.accent))
         }
+        // Desktop makes the badge compact on covers under 160px tall.
+        download?.let { DownloadBadge(it, compact = slot.rows <= 2, modifier = Modifier.align(Alignment.Center)) }
     }
 }

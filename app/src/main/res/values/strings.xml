@@ -160,6 +160,14 @@
     <string name="plugin_uninstall">卸载</string>
     <string name="plugin_uninstall_title">卸载 %1$s？</string>
     <string name="plugin_uninstall_message">插件文件会被删除，登录信息保留，重新安装后可继续使用。</string>
+    <string name="track_download">下载</string>
+    <string name="download_preparing">准备下载</string>
+    <string name="download_downloading">下载中</string>
+    <string name="download_saving">正在保存</string>
+    <string name="download_started">开始下载「%1$s」</string>
+    <string name="download_done">%1$s - %2$s 下载完毕</string>
+    <string name="download_downgraded">%1$s - %2$s 下载完毕（%3$s 不可用，已下载 %4$s）</string>
+    <string name="download_failed">下载失败：%1$s</string>
     <string name="qr_title">扫码登录</string>
     <string name="qr_login">扫码登录</string>
     <string name="qr_relogin">重新扫码</string>

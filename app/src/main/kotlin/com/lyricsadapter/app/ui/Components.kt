@@ -201,6 +201,9 @@ sealed interface MenuEntry {
     ) : MenuEntry
 
     data object Separator : MenuEntry
+
+    /** A small heading over the items that follow, such as "Download" over its qualities. */
+    data class Label(val text: String) : MenuEntry
 }
 
 /**
@@ -232,6 +235,11 @@ fun ContextMenu(anchor: IntOffset, entries: List<MenuEntry>, onDismiss: () -> Un
             entries.forEach { entry ->
                 when (entry) {
                     MenuEntry.Separator -> Box(Modifier.fillMaxWidth().height(6.dp).background(colors.surface))
+                    is MenuEntry.Label -> BasicText(
+                        entry.text,
+                        style = TextStyle(color = colors.secondaryText, fontSize = 13.sp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp),
+                    )
                     is MenuEntry.Item -> {
                         val tint = if (entry.danger) colors.danger else colors.text
                         Row(

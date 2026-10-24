@@ -43,6 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.plugins.DownloadOutcome
+import com.lyricsadapter.app.plugins.DownloadQuality
 import com.lyricsadapter.app.data.CloudStatus
 import com.lyricsadapter.app.data.ColorMode
 import com.lyricsadapter.app.data.EditResult
@@ -81,6 +83,7 @@ fun AppScreen(container: AppContainer) {
     val cloudTracks by container.cloud.tracks.collectAsStateWithLifecycle()
     val cloudStatus by container.cloud.status.collectAsStateWithLifecycle()
     val onlineEntries by container.online.entries.collectAsStateWithLifecycle()
+    val downloads by container.downloads.progress.collectAsStateWithLifecycle()
     val openedPlaylist by container.online.playlist.collectAsStateWithLifecycle()
     val plugins by container.plugins.plugins.collectAsStateWithLifecycle()
     val playerState by player.state.collectAsStateWithLifecycle()
@@ -107,6 +110,7 @@ fun AppScreen(container: AppContainer) {
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> library.import(uris) }
     val importFiles = { pickFiles.launch(arrayOf("audio/*")) }
     LaunchedEffect(library) { library.events.collect { notice -> context.showNotice(notice) } }
+    LaunchedEffect(container.downloads) { container.downloads.results.collect { outcome -> context.showDownload(outcome) } }
 
     val cloudList = remember(cloudTracks) { cloudTracks.map { it.toTrack() } }
     val onlineList = remember(onlineEntries) { onlineEntries.map { it.toTrack() } }
@@ -193,11 +197,18 @@ fun AppScreen(container: AppContainer) {
                 bottom = insets.calculateBottomPadding() + if (current != null) MINI_PLAYER_SPACE else 0.dp,
             ),
             selection = selection,
+            downloads = downloads,
             onSelectionChange = { selection = it },
             actions = LibraryActions(
                 onPlay = { index -> player.play(slotTracks, index) },
                 onEdit = { track -> editingId = track.id },
                 onRemove = { ids -> if (slot == SlotId.Online) container.online.remove(ids) else library.remove(ids) },
+                onDownload = { track, quality ->
+                    container.online.find(track.id)?.song?.let { song ->
+                        container.downloads.start(song, quality)
+                        Toast.makeText(context, context.getString(R.string.download_started, song.title), Toast.LENGTH_SHORT).show()
+                    }
+                },
                 onSwitchSlot = switchSlot,
                 onSearch = { palette = PaletteMode.Library },
             ),
@@ -329,6 +340,21 @@ private suspend fun loadPlaylists(container: AppContainer): List<OnlinePlaylist>
         }
     }.awaitAll().flatten()
 }
+
+/** Desktop's download notifications (`trackDownloadSuccess`, `trackDownloadDowngraded`, `downloadFailed`). */
+private fun Context.showDownload(outcome: DownloadOutcome) {
+    val song = outcome.song
+    val artist = song.artist.replace(" / ", " & ")
+    val message = when (outcome) {
+        is DownloadOutcome.Saved if outcome.downgraded ->
+            getString(R.string.download_downgraded, artist, song.title, qualityLabel(outcome.requested), qualityLabel(outcome.served))
+        is DownloadOutcome.Saved -> getString(R.string.download_done, artist, song.title)
+        is DownloadOutcome.Failed -> getString(R.string.download_failed, outcome.reason)
+    }
+    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+}
+
+private fun qualityLabel(id: String): String = DownloadQuality.entries.firstOrNull { it.id == id }?.label ?: id.uppercase()
 
 private fun Context.showNotice(notice: LibraryNotice) {
     val message = when (notice) {

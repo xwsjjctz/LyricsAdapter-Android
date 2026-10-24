@@ -118,7 +118,7 @@ private class OnlineStreams(private val sources: MusicSources, private val onlin
         val (source, songmid) = parseOnlineTrackId(id) ?: return dataSpec
         val now = System.currentTimeMillis()
         val (url, headers) = resolved[id]?.takeIf { it.first > now }?.second ?: try {
-            runBlocking { sources.stream(source, songmid, online.find(id)?.song?.mediaMid) }
+            runBlocking { sources.stream(source, songmid, online.find(id)?.song?.mediaMid).let { it.url to it.headers } }
         } catch (error: MusicSourceException) {
             throw IOException(error.message, error)
         }.also { resolved[id] = (now + STREAM_TTL_MS) to it }
