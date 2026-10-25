@@ -61,8 +61,8 @@ import kotlinx.coroutines.launch
 private const val LINE_HEIGHT = 1.2f
 private const val LETTER_SPACING = -0.025f
 
-/** The lyrics' side margins; desktop's portrait text starts 40px in on a 402px-wide window. */
-private val LINE_PADDING = 36.dp
+/** The lyrics' side margins in portrait; desktop's portrait text starts 40px in on a 402px-wide window. */
+val LINE_PADDING = 36.dp
 
 /** Desktop's blur, measured on its focus mode: 0.8px per line of distance plus one line below the sung one and two above, never past 5px. */
 private const val BLUR_PER_LINE = 0.8f
@@ -109,6 +109,8 @@ fun LyricsView(
     controlsShown: () -> Float = { 0f },
     settings: FocusSettings = FocusSettings(),
     anchor: LyricsAnchor = LyricsAnchor.Top,
+    /** How far the text sits from the view's sides. */
+    linePadding: Dp = LINE_PADDING,
     /** Translated text by line index, shown under each line. */
     translations: Map<Int, String> = emptyMap(),
     onScrollingChange: (Boolean) -> Unit = {},
@@ -195,12 +197,13 @@ fun LyricsView(
                             gap = gap,
                             blurStrength = blurStrength,
                             translation = translations[item.index],
+                            linePadding = linePadding,
                             onClick = {
                                 onLineClick(item.line)
                                 followSong(after = 0)
                             },
                         )
-                        is InterludeItem -> InterludeDots(item, active = index == active, position = position, fontSize = settings.fontSize.toFloat(), linePadding = LINE_PADDING)
+                        is InterludeItem -> InterludeDots(item, active = index == active, position = position, fontSize = settings.fontSize.toFloat(), linePadding = linePadding)
                     }
                 }
             }
@@ -243,6 +246,7 @@ private fun LyricLineText(
     gap: Dp,
     blurStrength: Float,
     translation: String?,
+    linePadding: Dp,
     onClick: () -> Unit,
 ) {
     val active = distance == 0f
@@ -256,7 +260,7 @@ private fun LyricLineText(
         Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = LINE_PADDING, vertical = gap)
+            .padding(horizontal = linePadding, vertical = gap)
             .graphicsLayer {
                 val scale = 0.97f + 0.03f * emphasis
                 scaleX = scale
@@ -279,8 +283,8 @@ private fun LyricLineText(
             BasicText(
                 text = translation,
                 style = translationStyle,
-                // Desktop's translation line sits at 0.3 inside the line, which is at 0.85 while sung.
-                modifier = Modifier.graphicsLayer { alpha = TRANSLATION_ALPHA * (1f - (1f - SUNG_LINE_ALPHA) * emphasis) },
+                // Desktop's translation line sits at 0.3 inside its line, which is at 0.2, or 0.85 while sung.
+                modifier = Modifier.graphicsLayer { alpha = TRANSLATION_ALPHA * (OTHER_LINE_ALPHA + (SUNG_LINE_ALPHA - OTHER_LINE_ALPHA) * emphasis) },
             )
         }
     }
@@ -300,6 +304,7 @@ private fun translationStyle(style: TextStyle): TextStyle {
 
 private const val TRANSLATION_ALPHA = 0.3f
 private const val SUNG_LINE_ALPHA = 0.85f
+private const val OTHER_LINE_ALPHA = 0.2f
 
 /**
  * The [BlurEffect] radius that blurs as much as CSS `blur(sigma)`: CSS takes
