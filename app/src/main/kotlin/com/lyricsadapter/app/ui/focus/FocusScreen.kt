@@ -59,6 +59,7 @@ import com.lyricsadapter.app.playback.SystemVolume
 import com.lyricsadapter.app.ui.Cover
 import com.lyricsadapter.library.Track
 import kotlinx.coroutines.launch
+import com.lyricsadapter.app.ui.blocksTouches
 
 /** How far the header must be pulled down to close focus mode. */
 private val DISMISS_DISTANCE = 120.dp
@@ -165,7 +166,7 @@ fun FocusScreen(
         )
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().graphicsLayer { translationY = dismiss }) {
+    BoxWithConstraints(Modifier.fillMaxSize().blocksTouches().graphicsLayer { translationY = dismiss }) {
         if (settings.flowingBackground && flowingBackgroundSupported) {
             FlowingBackground(track.coverPath, playback.isPlaying, Modifier.fillMaxSize())
         } else {

@@ -39,6 +39,7 @@ class WebDavException(message: String, cause: Throwable? = null) : IOException(m
 private val AUDIO_EXTENSIONS = setOf("flac", "mp3", "m4a", "wav", "ogg", "aac")
 private const val TIMEOUT_SECONDS = 20L
 private const val DAV = "DAV:"
+private const val JSON_UTF8 = "application/json; charset=utf-8"
 
 /**
  * The WebDAV requests the library needs, following desktop's `webdavCore.ts`
@@ -92,6 +93,36 @@ class WebDavClient(
                 while (buffer.size < wanted && source.read(buffer, (wanted - buffer.size).coerceAtMost(SEGMENT)) != -1L) Unit
                 buffer.readByteArray()
             }
+        }
+    }
+
+    /** Writes a UTF-8 text file (desktop's `uploadTextFile`); throws with the status when the server refuses. */
+    suspend fun putText(path: String, content: String, contentType: String = JSON_UTF8) = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(WebDavPath.url(config.serverUrl, path))
+            .header("Authorization", authorization)
+            .put(content.toRequestBody(contentType.toMediaType()))
+            .build()
+        execute(request) { response ->
+            if (!response.isSuccessful) throw WebDavException("PUT failed: ${response.code} ${response.message}".trim())
+        }
+    }
+
+    /**
+     * Desktop's `ensureCollection`: MKCOL, where 201 (made) and 405 (already
+     * there) both mean ready. False when the server will not make it; the
+     * caller can still try to PUT, as some servers create folders themselves.
+     */
+    suspend fun ensureCollection(path: String): Boolean = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(WebDavPath.url(config.serverUrl, path, directory = true))
+            .header("Authorization", authorization)
+            .method("MKCOL", null)
+            .build()
+        try {
+            execute(request) { response -> response.isSuccessful || response.code == 405 }
+        } catch (_: WebDavException) {
+            false
         }
     }
 

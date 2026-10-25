@@ -67,6 +67,7 @@ import com.lyricsadapter.app.ui.formatDuration
 import com.lyricsadapter.library.Track
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import com.lyricsadapter.app.ui.blocksTouches
 
 /** Desktop's palette groups, in the order they are listed. */
 enum class CommandGroup(val titleRes: Int) {
@@ -185,7 +186,7 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
         query = ""
     }
 
-    Column(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().blocksTouches().background(colors.background).safeDrawingPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(colors.surface).padding(horizontal = 10.dp, vertical = 9.dp),

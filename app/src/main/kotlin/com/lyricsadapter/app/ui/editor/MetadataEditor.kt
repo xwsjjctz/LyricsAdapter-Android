@@ -63,6 +63,7 @@ import com.lyricsadapter.lyrics.WordLyricsFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.lyricsadapter.app.ui.blocksTouches
 
 private val LRC_TIMESTAMP = Regex("\\[\\d+:\\d+")
 
@@ -137,7 +138,7 @@ fun MetadataEditor(track: Track, onSave: (TrackEdit, (EditResult) -> Unit) -> Un
         }
     }
 
-    Column(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().blocksTouches().background(colors.background).safeDrawingPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextAction(stringResource(R.string.cancel), onClick = onClose)
             BasicText(

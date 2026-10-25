@@ -75,8 +75,13 @@ catalog v2) and must match its pinned SHA-256. Secrets use desktop's names
 Keystore-encrypted store. Online songs play as `online:<source>:<songmid>`
 URIs that `PlaybackService` resolves through the plugin when the stream opens,
 falling back `flac → 320 → 128 → m4a` like desktop's stream protocol.
-Plugins on the newer platform API (`manifestVersion`, such as LLM translation)
-are refused for now. `./gradlew :plugin-host-spike:run --args="probe --query …"`
+Plugins on desktop's platform API (`manifestVersion`, `activate(context)`) run
+through `PlatformPlugin` and compat-js `platformRuntime.js`, for the
+`lyrics.translation` extension only (desktop's `pluginRuntime.ts` and
+`pluginValidation.ts` are the contract); platform music sources are refused.
+`./gradlew :plugin-host-spike:run --args="translate"` runs the installed LLM
+translation plugin against a local stand-in model.
+`./gradlew :plugin-host-spike:run --args="probe --query …"`
 lists which search results stream without a login, for manual testing.
 
 ## Cloud library
@@ -85,8 +90,9 @@ The cloud slot reads the WebDAV library the way desktop's `useWebDAV` does:
 list the root directory, trust a `Metadata/_manifest.json` entry while its
 size and `getlastmodified` still match the file, fill covers and lyrics from
 the chunks in the background, and read tags from the first bytes of a song
-the manifest does not describe. Android does not write the metadata folder
-yet; desktop keeps it up to date. Playback adds Basic authentication only for
+the manifest does not describe. Like desktop, it writes what those head reads
+found back to the folder (`CloudMetadataWriter`: server manifest as baseline,
+chunks first and manifest last) only on 123pan; generic WebDAV stays read-only. Playback adds Basic authentication only for
 the WebDAV host (`PlaybackService`), so redirects to a CDN never carry it.
 
 ## Tag writing
@@ -132,6 +138,12 @@ GitHub release. It needs the `ANDROID_KEYSTORE_BASE64`,
 secrets. Release builds use R8: keep rules for reflection-based code (JNA and
 the UniFFI bindings) live in `app/proguard-rules.pro`, and resources must be
 loaded by absolute path, because R8 moves classes between packages.
+
+## Testing on a device
+
+The test phone's ROM sets `persist.log.tag=S`, silencing app logs. To see one
+tag, run `adb shell setprop log.tag.<Tag> VERBOSE`, and set it back to `S`
+afterwards.
 
 ## Build notes
 

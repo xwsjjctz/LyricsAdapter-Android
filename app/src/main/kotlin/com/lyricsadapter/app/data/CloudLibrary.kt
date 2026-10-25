@@ -8,6 +8,10 @@ import com.lyricsadapter.library.Track
 import com.lyricsadapter.lyrics.WordLyricsFormat
 import com.lyricsadapter.webdav.Chunk
 import com.lyricsadapter.webdav.CloudMetadataReader
+import java.util.Base64
+import com.lyricsadapter.webdav.SyncedLine
+import com.lyricsadapter.webdav.LocalMetadata
+import com.lyricsadapter.webdav.CloudMetadataWriter
 import com.lyricsadapter.webdav.ManifestEntry
 import com.lyricsadapter.webdav.WebDavClient
 import com.lyricsadapter.webdav.WebDavConfig
@@ -123,7 +127,8 @@ class CloudLibrary(
         state.value = listed
         writeCache(config, listed)
         if (manifest != null) fillDetails(reader, manifest.entries, config)
-        readHeads(client, config)
+        val read = readHeads(client, config)
+        if (read.isNotEmpty() && writesMetadata(config)) shareMetadata(client, read, files.mapTo(HashSet(), WebDavFile::path))
         covers.deleteExcept(state.value.mapNotNullTo(HashSet()) { it.coverPath })
     }
 
@@ -151,9 +156,9 @@ class CloudLibrary(
      * tags from the start of the file. The bytes go into a sparse file of the
      * song's full size, so formats that estimate duration from size get it right.
      */
-    private suspend fun readHeads(client: WebDavClient, config: WebDavConfig) {
+    private suspend fun readHeads(client: WebDavClient, config: WebDavConfig): Set<String> {
         val pending = state.value.filter { !it.probed && it.durationMs == 0L }
-        if (pending.isEmpty()) return
+        if (pending.isEmpty()) return emptySet()
         val gate = Semaphore(CHUNK_CONCURRENCY)
         coroutineScope {
             pending.map { track ->
@@ -164,6 +169,48 @@ class CloudLibrary(
             }.awaitAll()
         }
         writeCache(config, state.value)
+        return pending.mapTo(HashSet(), CloudTrack::path)
+    }
+
+    /**
+     * Shares what the file heads told us through the metadata folder, so other
+     * devices list these songs without reading them again. Desktop writes the
+     * folder only on 123pan (`providerConfig.ts`; generic WebDAV is read-only),
+     * and so does Android. A failed write leaves the library as it is.
+     */
+    private suspend fun shareMetadata(client: WebDavClient, paths: Set<String>, listed: Set<String>) {
+        val songs = state.value.filter { it.path in paths && it.durationMs > 0 }.map { track ->
+            val synced = track.toTrack().parsedLyrics().lines.map { SyncedLine(it.startMs / 1000.0, it.text) }
+            LocalMetadata(
+                path = track.path,
+                title = track.title,
+                artist = track.artist.orEmpty(),
+                album = track.album.orEmpty(),
+                duration = track.durationMs / 1000.0,
+                fileSize = track.size,
+                lastModified = track.lastModified,
+                coverDataUrl = track.coverPath?.let(::dataUrl),
+                lyrics = track.lyrics,
+                syncedLyrics = synced.ifEmpty { null },
+            )
+        }
+        if (songs.isEmpty()) return
+        try {
+            CloudMetadataWriter(client).upload(songs, listed)
+        } catch (error: WebDavException) {
+            Log.w(TAG, "Could not write the cloud metadata folder", error)
+        }
+    }
+
+    /** A cover file as a self-contained `data:` URL, the only kind the metadata folder may hold. */
+    private fun dataUrl(path: String): String? {
+        val file = File(path).takeIf(File::exists) ?: return null
+        val mime = when (file.extension.lowercase()) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            else -> "image/jpeg"
+        }
+        return "data:$mime;base64," + Base64.getEncoder().encodeToString(file.readBytes())
     }
 
     private suspend fun headTags(client: WebDavClient, track: CloudTrack): AudioTags? {
@@ -235,6 +282,9 @@ class CloudLibrary(
     }
 
     private companion object {
+        /** Desktop's `detectProvider`: only 123pan gets the metadata folder written. */
+        fun writesMetadata(config: WebDavConfig) = "123pan.cn" in config.serverUrl.lowercase()
+
         const val TAG = "CloudLibrary"
     }
 }

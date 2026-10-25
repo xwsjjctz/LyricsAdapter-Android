@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -320,5 +321,15 @@ fun ConfirmDialog(
                 }, bold = true, color = if (danger) colors.danger else null)
             }
         }
+    }
+}
+
+/**
+ * For a full-screen layer over another screen: the layer takes every touch
+ * that lands on it, so taps on its empty parts never reach what is underneath.
+ */
+fun Modifier.blocksTouches(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) awaitPointerEvent()
     }
 }

@@ -52,6 +52,7 @@ import com.lyricsadapter.webdav.WebDavClient
 import com.lyricsadapter.webdav.WebDavConfig
 import com.lyricsadapter.webdav.WebDavException
 import kotlinx.coroutines.launch
+import com.lyricsadapter.app.ui.blocksTouches
 
 /** The settings pages, as desktop's settings navigation lists them. */
 enum class SettingsPage(val titleRes: Int) {
@@ -92,7 +93,7 @@ fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: 
         else -> stringResource(page.titleRes)
     }
 
-    Column(Modifier.fillMaxSize().background(colors.background).safeDrawingPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().blocksTouches().background(colors.background).safeDrawingPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(R.drawable.ui_arrow_back, stringResource(R.string.back), tint = colors.accent, onClick = back)
             BasicText(

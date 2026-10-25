@@ -11,8 +11,8 @@ import java.util.Base64
  *   Metadata/_manifest.json    light index: list text and fingerprints, no covers or lyrics
  *   Metadata/_chunk_0001.json  heavy details (cover data URL, lyrics) for up to 50 songs
  *
- * Paths are the songs' library paths. Android reads this format and leaves
- * writing it to desktop for now.
+ * Paths are the songs' library paths. CloudMetadataReader reads the folder;
+ * CloudMetadataWriter writes it where desktop would (123pan).
  */
 
 @Serializable
@@ -69,7 +69,7 @@ class CoverBytes(val mimeType: String, val data: ByteArray)
 
 private val json = Json { ignoreUnknownKeys = true }
 
-private const val MANIFEST_PATH = "/Metadata/_manifest.json"
+internal const val MANIFEST_PATH = "/Metadata/_manifest.json"
 
 fun chunkPath(chunkId: String) = "/Metadata/_chunk_$chunkId.json"
 
