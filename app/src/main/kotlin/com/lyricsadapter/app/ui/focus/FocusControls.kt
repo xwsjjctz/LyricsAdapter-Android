@@ -133,14 +133,14 @@ internal fun FocusControls(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconControl(R.drawable.ms_fast_rewind, stringResource(R.string.action_previous), 42.dp, onClick = onPrevious)
+            IconControl(R.drawable.tp_backward, stringResource(R.string.action_previous), 42.dp, onClick = onPrevious)
             IconControl(
-                icon = if (isPlaying) R.drawable.ms_pause else R.drawable.ms_play_arrow,
+                icon = if (isPlaying) R.drawable.tp_pause else R.drawable.tp_play,
                 label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
                 glyph = 58.dp,
                 onClick = onTogglePlay,
             )
-            IconControl(R.drawable.ms_fast_forward, stringResource(R.string.action_next), 42.dp, onClick = onNext)
+            IconControl(R.drawable.tp_forward, stringResource(R.string.action_next), 42.dp, onClick = onNext)
         }
         VolumeRow(volume, mode, translation, onVolumeChange, onToggleMute, onCyclePlaybackMode, onToggleTranslation, Modifier.height(VOLUME_ROW))
     }
