@@ -66,7 +66,7 @@ internal fun PlatformPluginSettings(container: AppContainer, plugin: InstalledPl
         }
     }
 
-    SettingsGroup(title = stringResource(R.string.plugin_settings)) {
+    if (manifest.configuration.isNotEmpty()) SettingsGroup(title = stringResource(R.string.plugin_settings)) {
         manifest.configuration.forEachIndexed { index, field ->
             if (index > 0) RowDivider()
             val value = values[field.key] ?: field.default
@@ -87,14 +87,15 @@ internal fun PlatformPluginSettings(container: AppContainer, plugin: InstalledPl
         }
     }
 
-    val provider = manifest.translators.first()
-    val preferred by container.settings.translationLanguage.value.collectAsStateWithLifecycle()
-    val languages = provider.languages ?: TranslationLanguages.DEFAULT
-    val chosen = TranslationLanguages.effective(languages, preferred)
-    SettingsGroup(title = stringResource(R.string.translation_language)) {
-        languages.forEachIndexed { index, tag ->
-            if (index > 0) RowDivider()
-            CheckRow(TranslationLanguages.displayName(tag), checked = tag == chosen) { container.settings.translationLanguage.set(tag) }
+    manifest.translators.firstOrNull()?.let { provider ->
+        val preferred by container.settings.translationLanguage.value.collectAsStateWithLifecycle()
+        val languages = provider.languages ?: TranslationLanguages.DEFAULT
+        val chosen = TranslationLanguages.effective(languages, preferred)
+        SettingsGroup(title = stringResource(R.string.translation_language)) {
+            languages.forEachIndexed { index, tag ->
+                if (index > 0) RowDivider()
+                CheckRow(TranslationLanguages.displayName(tag), checked = tag == chosen) { container.settings.translationLanguage.set(tag) }
+            }
         }
     }
 

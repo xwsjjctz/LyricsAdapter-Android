@@ -150,7 +150,7 @@ private class PluginTexts(val installed: String, val unsupported: String)
 private fun pluginState(plugin: InstalledPlugin): String = stringResource(
     when {
         !plugin.enabled -> R.string.plugin_disabled
-        plugin.manifest.platform != null -> R.string.plugin_kind_translation
+        plugin.manifest.platform?.let { it.musicSource == null } == true -> R.string.plugin_kind_translation
         plugin.signedIn -> R.string.plugin_signed_in
         plugin.manifest.requiresCookie -> R.string.plugin_signed_out
         else -> R.string.plugin_ready
@@ -179,9 +179,8 @@ internal fun PluginDetailPage(container: AppContainer, id: String, onLogin: () -
             scope.launch { container.plugins.setEnabled(id, enabled) }
         }
     }
-    if (plugin.manifest.platform != null) {
-        PlatformPluginSettings(container, plugin)
-    } else if (plugin.enabled) {
+    if (plugin.manifest.platform != null) PlatformPluginSettings(container, plugin)
+    if (plugin.enabled && (plugin.manifest.platform == null || plugin.manifest.platform.musicSource != null)) {
         SettingsGroup(title = stringResource(R.string.plugin_account), footer = stringResource(if (id in QR_LOGIN_SOURCES) R.string.qr_login_footer else R.string.cookie_login_footer)) {
             if (id in QR_LOGIN_SOURCES) {
                 SettingsRow(stringResource(if (plugin.signedIn) R.string.qr_relogin else R.string.qr_login), onClick = onLogin)

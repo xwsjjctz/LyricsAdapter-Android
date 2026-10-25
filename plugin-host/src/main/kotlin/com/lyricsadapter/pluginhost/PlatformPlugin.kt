@@ -13,14 +13,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.boolean
 import java.io.File
 import java.util.UUID
 
 /**
  * One plugin on desktop's plugin platform (`activate(context)`) running in its
- * own QuickJS runtime, for the lyrics.translation extension. Requests and
- * results are checked as desktop checks them (`pluginValidation.ts`), and each
- * call has the provider's declared deadline.
+ * own QuickJS runtime. A `music.source` provider answers the same calls as a
+ * legacy plugin; translation requests and results are checked as desktop
+ * checks them (`pluginValidation.ts`), each with the provider's deadline.
  */
 class PlatformPlugin private constructor(
     val manifest: PlatformManifest,
@@ -29,7 +32,23 @@ class PlatformPlugin private constructor(
     val settings: PlatformPluginSettings,
     val cache: PluginCache,
     private val scope: CoroutineScope,
-) : AutoCloseable {
+    private val callTimeoutMillis: Long,
+) : MusicSourcePlugin {
+    override val id: String get() = manifest.id
+
+    override suspend fun call(method: String, args: JsonArray): JsonElement =
+        music("call", buildJsonObject { put("method", method); put("args", args) })
+
+    override suspend fun invoke(action: String, args: JsonArray): JsonElement =
+        music("invoke", buildJsonObject { put("action", action); put("args", args) })
+
+    override suspend fun streamHeaders(cookie: String): Map<String, String> =
+        music("streamHeaders", buildJsonObject { put("cookie", cookie) }).jsonObject.mapValues { (_, value) -> value.jsonPrimitive.content }
+
+    override suspend fun requiresCookie(): Boolean = music("requiresCookie", JsonObject(emptyMap())).jsonPrimitive.boolean
+
+    private suspend fun music(operation: String, payload: JsonObject): JsonElement =
+        Json.parseToJsonElement(requests.submit(operation, payload.toString(), callTimeoutMillis))
 
     /** Translates [request] (a `TranslationRequest`) with the provider [providerId]; returns the validated `TranslationResult`. */
     suspend fun translate(providerId: String, request: JsonObject): JsonObject {
@@ -100,7 +119,7 @@ class PlatformPlugin private constructor(
                 throw error
             }
             val scope = CoroutineScope(SupervisorJob() + environment.jobDispatcher)
-            val plugin = PlatformPlugin(manifest, js, requests, settings, cache, scope)
+            val plugin = PlatformPlugin(manifest, js, requests, settings, cache, scope, environment.callTimeoutMillis)
             plugin.serve()
             try {
                 // Activation is a request like any other, served by the runtime's event loop.

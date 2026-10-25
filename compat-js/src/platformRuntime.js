@@ -2,12 +2,14 @@
  * Hosts one plugin on desktop's plugin platform (`manifestVersion: 1`,
  * `activate(context)`), following the contract in the desktop app's
  * src/shared/plugin.ts and electron/services/pluginRuntime.ts (LyricsAdapter
- * repository). Android supports the lyrics.translation extension.
+ * repository). Android supports the music.source and lyrics.translation
+ * extensions; a music source answers the same calls as a legacy plugin.
  *
  * The host answers what JavaScript cannot decide alone: configuration values
  * (secret fields included), the origins the plugin may reach, and the
  * plugin's file-backed cache. serve() is the runtime's event loop.
  */
+import { describe, MUSIC_OPERATIONS, musicDispatch, validateMusicSource } from './musicSource.js';
 const DATA_KEY = /^[a-z][a-z0-9-]{0,63}$/;
 const DEFAULT_FETCH_TIMEOUT_MS = 20000;
 const MAX_FETCH_TIMEOUT_MS = 120000;
@@ -15,13 +17,9 @@ const MAX_BODY_BYTES = 1000000;
 const MAX_STORAGE_JSON = 65536;
 const MAX_SECRET_LENGTH = 65536;
 const MAX_CONCURRENT_CALLS = 4;
-const EXTENSION_APIS = { 'lyrics.translation': '1.2.0' };
+const EXTENSION_APIS = { 'music.source': '1.0.0', 'lyrics.translation': '1.2.0' };
 const CORE_API = '1.1.0';
 
-function describe(error) {
-  if (error instanceof Error) return error.message || error.name;
-  return String(error);
-}
 
 function utf8Length(text) {
   return new TextEncoder().encode(text).length;
@@ -153,7 +151,8 @@ export function createPlatformRuntime({ pluginId, host, requireModule, format, a
           }
           const key = `${type}:${id}`;
           if (providers.has(key)) throw new Error('Provider is already registered');
-          if (typeof provider?.translate !== 'function') throw new Error('Invalid translation provider');
+          if (type === 'lyrics.translation' && typeof provider?.translate !== 'function') throw new Error('Invalid translation provider');
+          if (type === 'music.source') validateMusicSource(provider, pluginId);
           providers.set(key, provider);
           return disposable(() => providers.delete(key));
         },
@@ -290,7 +289,17 @@ export function createPlatformRuntime({ pluginId, host, requireModule, format, a
     }
   }
 
+  /** The registered music source, as desktop's `PluginRuntime.music()`. */
+  function music() {
+    ensureLive();
+    const entry = manifest?.contributes.providers.find((item) => item.type === 'music.source');
+    const provider = entry && providers.get(`music.source:${entry.id}`);
+    if (!provider) throw new Error('Music source is not active');
+    return provider;
+  }
+
   async function dispatch(operation, payload) {
+    if (MUSIC_OPERATIONS.has(operation)) return musicDispatch(music(), operation, payload);
     switch (operation) {
       case 'activate':
         return activate(payload.manifest);

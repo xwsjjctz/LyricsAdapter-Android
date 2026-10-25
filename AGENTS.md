@@ -76,9 +76,10 @@ Keystore-encrypted store. Online songs play as `online:<source>:<songmid>`
 URIs that `PlaybackService` resolves through the plugin when the stream opens,
 falling back `flac → 320 → 128 → m4a` like desktop's stream protocol.
 Plugins on desktop's platform API (`manifestVersion`, `activate(context)`) run
-through `PlatformPlugin` and compat-js `platformRuntime.js`, for the
-`lyrics.translation` extension only (desktop's `pluginRuntime.ts` and
-`pluginValidation.ts` are the contract); platform music sources are refused.
+through `PlatformPlugin` and compat-js `platformRuntime.js` (desktop's
+`pluginRuntime.ts` and `pluginValidation.ts` are the contract), for the
+`music.source` and `lyrics.translation` extensions. Music sources of either
+API answer the same calls (`MusicSourcePlugin`, compat-js `musicSource.js`).
 `./gradlew :plugin-host-spike:run --args="translate"` runs the installed LLM
 translation plugin against a local stand-in model.
 `./gradlew :plugin-host-spike:run --args="probe --query …"`

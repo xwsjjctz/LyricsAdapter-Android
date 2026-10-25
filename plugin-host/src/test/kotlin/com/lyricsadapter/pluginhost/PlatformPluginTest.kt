@@ -124,4 +124,46 @@ class PlatformPluginTest {
         assertEquals(null, PlatformManifest.networkOrigin("http://example.com/v1"))
         assertEquals("https://api.openai.com", PlatformManifest.networkOrigin("https://api.openai.com/v1"))
     }
+
+    @Test
+    fun `serves a music source registered on the platform API`() = runBlocking<Unit> {
+        val manifest = PlatformManifest.parse(
+            Json.parseToJsonElement(
+                """
+                {"manifestVersion":1,"id":"demo","name":"Demo","version":"1.0.0","main":"index.cjs",
+                 "coreApi":"^1.1.0","extensionApis":{"music.source":"^1.0.0"},"permissions":{"secrets":"own"},
+                 "contributes":{"providers":[{"type":"music.source","id":"default","name":"Demo"}]}}
+                """,
+            ).jsonObject,
+        )
+        val source = """
+            exports.activate = (context) => {
+              const provider = {
+                id: 'demo',
+                searchMusic: async (query) => [{ songmid: '1', songname: query, singer: [{ name: 'A' }] }],
+                getRecommendedSongs: async () => [], getMusicUrl: async () => ({ url: 'https://example.com/1.mp3' }),
+                getLyrics: async () => ({}), getPlaylists: async () => [], getPlaylistSongs: async () => [],
+                requiresCookie: () => true,
+                getCoverUrl: (song) => 'https://example.com/' + song.songmid + '.jpg',
+              };
+              context.extensions.register('music.source', 'default', {
+                provider,
+                invoke: async (action, args) => ({ action, args }),
+                streamHeaders: (cookie) => ({ cookie: cookie + '|' + context.secrets.get('cookie') }),
+                validateCookie: async (cookie) => ({ valid: cookie === 'ok' }),
+              });
+            };
+        """.trimIndent()
+        store.writeSecrets("demo", mapOf("cookie" to "stored"))
+        PlatformPlugin.start(manifest, source, environment, cacheDirectory = null).use { plugin ->
+            val songs = plugin.call("searchMusic", Json.parseToJsonElement("""["晴天"]""").jsonArray)
+            val song = songs.jsonArray.single().jsonObject
+            assertEquals("晴天", song["songname"]!!.jsonPrimitive.content)
+            assertEquals("https://example.com/1.jpg", song["coverUrlFullSize"]!!.jsonPrimitive.content)
+            assertEquals("qr-start", plugin.invoke("qr-start", Json.parseToJsonElement("[]").jsonArray).jsonObject["action"]!!.jsonPrimitive.content)
+            assertEquals(mapOf("cookie" to "c|stored"), plugin.streamHeaders("c"))
+            assertTrue(plugin.requiresCookie())
+            assertFailsWith<PluginCallException> { plugin.call("deleteEverything", Json.parseToJsonElement("[]").jsonArray) }
+        }
+    }
 }

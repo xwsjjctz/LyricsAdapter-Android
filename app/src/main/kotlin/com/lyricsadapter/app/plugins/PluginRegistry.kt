@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.lyricsadapter.app.data.SecretStore
 import com.lyricsadapter.pluginhost.LegacyMusicPlugin
+import com.lyricsadapter.pluginhost.MusicSourcePlugin
 import com.lyricsadapter.pluginhost.PlatformManifest
 import com.lyricsadapter.pluginhost.PlatformPlugin
 import com.lyricsadapter.pluginhost.PlatformPluginSettings
@@ -92,7 +93,7 @@ class PluginRegistry(
     val plugins: StateFlow<List<InstalledPlugin>> = state.asStateFlow()
 
     /** Enabled plugins that provide music. */
-    fun sources(): List<InstalledPlugin> = state.value.filter { it.enabled && it.manifest.platform == null }
+    fun sources(): List<InstalledPlugin> = state.value.filter { it.enabled && (it.manifest.platform == null || it.manifest.platform.musicSource != null) }
 
     /** Enabled plugins that translate lyrics. */
     fun translationPlugins(): List<InstalledPlugin> = state.value.filter { it.enabled && it.manifest.platform?.translators?.isNotEmpty() == true }
@@ -162,12 +163,16 @@ class PluginRegistry(
         refresh()
     }
 
-    /** The running plugin, started on first use. */
-    suspend fun runtime(id: String): LegacyMusicPlugin = lock.withLock {
-        runtimes[id]?.let { return it }
+    /** The running music source, started on first use, whichever plugin API it was written for. */
+    suspend fun runtime(id: String): MusicSourcePlugin {
         val plugin = state.value.firstOrNull { it.id == id && it.enabled } ?: throw PluginPackageException("插件未安装或已禁用：$id")
-        val code = File(File(directory, id), plugin.manifest.main).readText()
-        LegacyMusicPlugin.start(id, code, environment).also { runtimes[id] = it }
+        plugin.manifest.platform?.let { platform ->
+            if (platform.musicSource == null) throw PluginPackageException("这个插件不提供音乐源：$id")
+            return platformRuntime(id)
+        }
+        return lock.withLock {
+            runtimes[id] ?: LegacyMusicPlugin.start(id, File(File(directory, id), plugin.manifest.main).readText(), environment).also { runtimes[id] = it }
+        }
     }
 
     /** The running platform plugin, started and activated on first use. */
@@ -239,7 +244,9 @@ class PluginRegistry(
             } catch (error: IllegalArgumentException) {
                 throw PluginPackageException(error.message ?: "插件清单无效")
             }
-            return PluginManifest(platform.id, platform.name, platform.version, platform.main, false, listOf("translation"), platform.homepage, platform)
+            // Desktop's `validatePlatformManifest` summary: platform sources never require a cookie up front.
+            val capabilities = if (platform.musicSource != null) listOf("search", "stream", "lyrics", "playlists") else emptyList()
+            return PluginManifest(platform.id, platform.name, platform.version, platform.main, false, capabilities, platform.homepage, platform)
         }
         val requiresCookie = (json["requiresCookie"] as? JsonPrimitive)?.booleanOrNull ?: throw PluginPackageException("插件清单无效")
         val capabilities = (json["capabilities"] as? JsonArray)?.map { it.jsonPrimitive.content } ?: throw PluginPackageException("插件清单无效")

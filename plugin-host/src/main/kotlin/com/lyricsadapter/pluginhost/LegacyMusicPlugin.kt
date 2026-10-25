@@ -22,14 +22,14 @@ import kotlinx.serialization.json.put
  * methods and validateCookie through [call], login actions through [invoke].
  */
 class LegacyMusicPlugin private constructor(
-    val id: String,
+    override val id: String,
     private val js: QuickJs,
     private val requests: PluginRequestQueue,
     private val callTimeoutMillis: Long,
     private val scope: CoroutineScope,
-) : AutoCloseable {
+) : MusicSourcePlugin {
 
-    suspend fun call(method: String, args: JsonArray): JsonElement = request(
+    override suspend fun call(method: String, args: JsonArray): JsonElement = request(
         "call",
         buildJsonObject {
             put("method", method)
@@ -37,7 +37,7 @@ class LegacyMusicPlugin private constructor(
         },
     )
 
-    suspend fun invoke(action: String, args: JsonArray): JsonElement = request(
+    override suspend fun invoke(action: String, args: JsonArray): JsonElement = request(
         "invoke",
         buildJsonObject {
             put("action", action)
@@ -45,11 +45,11 @@ class LegacyMusicPlugin private constructor(
         },
     )
 
-    suspend fun streamHeaders(cookie: String): Map<String, String> =
+    override suspend fun streamHeaders(cookie: String): Map<String, String> =
         request("streamHeaders", buildJsonObject { put("cookie", cookie) })
             .jsonObject.mapValues { (_, value) -> value.jsonPrimitive.content }
 
-    suspend fun requiresCookie(): Boolean = request("requiresCookie", JsonObject(emptyMap())).jsonPrimitive.boolean
+    override suspend fun requiresCookie(): Boolean = request("requiresCookie", JsonObject(emptyMap())).jsonPrimitive.boolean
 
     private suspend fun request(operation: String, payload: JsonObject): JsonElement =
         Json.parseToJsonElement(requests.submit(operation, payload.toString(), callTimeoutMillis))

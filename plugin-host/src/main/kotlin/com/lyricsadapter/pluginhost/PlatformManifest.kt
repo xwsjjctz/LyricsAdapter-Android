@@ -30,8 +30,7 @@ data class ProviderContribution(val type: String, val id: String, val name: Stri
 /**
  * A plugin on desktop's plugin platform (`manifestVersion: 1`), validated as
  * desktop's `validatePlatformManifest` (electron/services/pluginManifest.ts)
- * does. Android hosts the lyrics.translation extension only; a music source
- * on the platform API is refused.
+ * does. Android hosts the music.source and lyrics.translation extensions.
  */
 data class PlatformManifest(
     val id: String,
@@ -46,6 +45,9 @@ data class PlatformManifest(
     /** The manifest as published, handed to the plugin runtime. */
     val json: JsonObject,
 ) {
+    /** The music source this plugin offers, if any. */
+    val musicSource: ProviderContribution? get() = providers.firstOrNull { it.type == MUSIC_SOURCE }
+
     /** The lyrics translation providers this plugin offers. */
     val translators: List<ProviderContribution> get() = providers.filter { it.type == TRANSLATION }
 
@@ -56,7 +58,8 @@ data class PlatformManifest(
     companion object {
         const val CORE_API = "1.1.0"
         const val TRANSLATION = "lyrics.translation"
-        val EXTENSION_APIS = mapOf(TRANSLATION to "1.2.0")
+        const val MUSIC_SOURCE = "music.source"
+        val EXTENSION_APIS = mapOf(MUSIC_SOURCE to "1.0.0", TRANSLATION to "1.2.0")
         const val DEFAULT_TRANSLATION_TIMEOUT_MILLIS = 180_000L
 
         private val PLUGIN_ID = Regex("^[a-z][a-z0-9-]{0,63}$")
@@ -90,8 +93,8 @@ data class PlatformManifest(
                 parseProvider(item as? JsonObject ?: throw IllegalArgumentException("Invalid provider contribution"), declared)
             }
             require(providers.map { "${it.type}:${it.id}" }.toSet().size == providers.size) { "Invalid provider contribution" }
-            require(providers.none { it.type == "music.source" }) { "Platform music sources are not supported on Android yet" }
-            require(providers.any { it.type == TRANSLATION }) { "This plugin offers nothing Android can use yet" }
+            require(providers.count { it.type == MUSIC_SOURCE } <= 1) { "Only one music source per plugin is supported" }
+            require(providers.any { it.type in EXTENSION_APIS }) { "This plugin offers nothing Android can use yet" }
 
             val permissions = json["permissions"]
             var network = emptyList<String>()

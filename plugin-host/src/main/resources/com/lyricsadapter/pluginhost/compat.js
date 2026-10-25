@@ -18896,6 +18896,9 @@
 
   // src/legacyRuntime.js
   init_inject();
+
+  // src/musicSource.js
+  init_inject();
   var PROVIDER_METHODS = /* @__PURE__ */ new Set(["searchMusic", "getRecommendedSongs", "getSongDetails", "getMusicUrl", "getLyrics", "getPlaylists", "getPlaylistSongs"]);
   var SONG_LIST_METHODS = /* @__PURE__ */ new Set(["searchMusic", "getRecommendedSongs", "getSongDetails", "getPlaylistSongs"]);
   var REQUIRED_PROVIDER_METHODS = ["searchMusic", "getRecommendedSongs", "getMusicUrl", "getLyrics", "getPlaylists", "getPlaylistSongs", "requiresCookie"];
@@ -18904,7 +18907,7 @@
     if (error instanceof Error) return error.message || error.name;
     return String(error);
   }
-  function validate(plugin, id) {
+  function validateMusicSource(plugin, id) {
     if (!plugin?.provider || plugin.provider.id !== id || typeof plugin.invoke !== "function" || typeof plugin.streamHeaders !== "function" || typeof plugin.validateCookie !== "function") {
       throw new Error("Invalid music plugin exports");
     }
@@ -18912,6 +18915,38 @@
       if (typeof plugin.provider[method] !== "function") throw new Error(`Missing provider method: ${method}`);
     }
   }
+  async function musicDispatch(plugin, operation, payload) {
+    switch (operation) {
+      case "call":
+        return callProvider(plugin, payload.method, payload.args);
+      case "invoke":
+        if (!Array.isArray(payload.args)) throw new Error("Invalid plugin invoke arguments");
+        return plugin.invoke(String(payload.action), payload.args);
+      case "streamHeaders":
+        return plugin.streamHeaders(String(payload.cookie));
+      case "requiresCookie":
+        return Boolean(plugin.provider.requiresCookie());
+      default:
+        return void 0;
+    }
+  }
+  var MUSIC_OPERATIONS = /* @__PURE__ */ new Set(["call", "invoke", "streamHeaders", "requiresCookie"]);
+  async function callProvider(current, method, args) {
+    if (!Array.isArray(args) || args.length > MAX_CALL_ARGS) throw new Error("Invalid plugin call arguments");
+    if (method === "validateCookie") {
+      if (args.length !== 1 || typeof args[0] !== "string") throw new Error("Invalid cookie validation call");
+      return current.validateCookie(args[0]);
+    }
+    const provider = current.provider;
+    if (!PROVIDER_METHODS.has(method) || typeof provider[method] !== "function") throw new Error(`Unsupported provider method: ${method}`);
+    const result = await provider[method](...args);
+    if (SONG_LIST_METHODS.has(method) && Array.isArray(result) && typeof provider.getCoverUrl === "function") {
+      return result.map((song) => song && typeof song === "object" ? { ...song, coverUrlFullSize: provider.getCoverUrl(song) } : song);
+    }
+    return result;
+  }
+
+  // src/legacyRuntime.js
   function createLegacyRuntime({ pluginId, host: host2, requireModule: requireModule2, format: format3 }) {
     let moduleExports;
     let plugin;
@@ -18935,38 +18970,12 @@
     function create() {
       if (typeof moduleExports?.createPlugin !== "function") throw new Error("Plugin must export createPlugin");
       const created = moduleExports.createPlugin(pluginHost);
-      validate(created, pluginId);
+      validateMusicSource(created, pluginId);
       plugin = created;
     }
-    async function call(method, args) {
-      if (!Array.isArray(args) || args.length > MAX_CALL_ARGS) throw new Error("Invalid plugin call arguments");
-      const current = loaded();
-      if (method === "validateCookie") {
-        if (args.length !== 1 || typeof args[0] !== "string") throw new Error("Invalid cookie validation call");
-        return current.validateCookie(args[0]);
-      }
-      const provider = current.provider;
-      if (!PROVIDER_METHODS.has(method) || typeof provider[method] !== "function") throw new Error(`Unsupported provider method: ${method}`);
-      const result = await provider[method](...args);
-      if (SONG_LIST_METHODS.has(method) && Array.isArray(result) && typeof provider.getCoverUrl === "function") {
-        return result.map((song) => song && typeof song === "object" ? { ...song, coverUrlFullSize: provider.getCoverUrl(song) } : song);
-      }
-      return result;
-    }
     async function dispatch(operation, payload) {
-      switch (operation) {
-        case "call":
-          return call(payload.method, payload.args);
-        case "invoke":
-          if (!Array.isArray(payload.args)) throw new Error("Invalid plugin invoke arguments");
-          return loaded().invoke(String(payload.action), payload.args);
-        case "streamHeaders":
-          return loaded().streamHeaders(String(payload.cookie));
-        case "requiresCookie":
-          return Boolean(loaded().provider.requiresCookie());
-        default:
-          throw new Error(`Unknown plugin operation: ${operation}`);
-      }
+      if (MUSIC_OPERATIONS.has(operation)) return musicDispatch(loaded(), operation, payload);
+      throw new Error(`Unknown plugin operation: ${operation}`);
     }
     function respond(id, value) {
       let json;
@@ -18998,12 +19007,8 @@
   var MAX_STORAGE_JSON = 65536;
   var MAX_SECRET_LENGTH = 65536;
   var MAX_CONCURRENT_CALLS = 4;
-  var EXTENSION_APIS = { "lyrics.translation": "1.2.0" };
+  var EXTENSION_APIS = { "music.source": "1.0.0", "lyrics.translation": "1.2.0" };
   var CORE_API = "1.1.0";
-  function describe2(error) {
-    if (error instanceof Error) return error.message || error.name;
-    return String(error);
-  }
   function utf8Length(text) {
     return new TextEncoder().encode(text).length;
   }
@@ -19125,7 +19130,8 @@
             }
             const key = `${type}:${id}`;
             if (providers.has(key)) throw new Error("Provider is already registered");
-            if (typeof provider?.translate !== "function") throw new Error("Invalid translation provider");
+            if (type === "lyrics.translation" && typeof provider?.translate !== "function") throw new Error("Invalid translation provider");
+            if (type === "music.source") validateMusicSource(provider, pluginId);
             providers.set(key, provider);
             return disposable(() => providers.delete(key));
           }
@@ -19255,7 +19261,15 @@
         }
       }
     }
+    function music() {
+      ensureLive();
+      const entry = manifest?.contributes.providers.find((item) => item.type === "music.source");
+      const provider = entry && providers.get(`music.source:${entry.id}`);
+      if (!provider) throw new Error("Music source is not active");
+      return provider;
+    }
     async function dispatch(operation, payload) {
+      if (MUSIC_OPERATIONS.has(operation)) return musicDispatch(music(), operation, payload);
       switch (operation) {
         case "activate":
           return activate(payload.manifest);
@@ -19276,7 +19290,7 @@
       try {
         json = JSON.stringify(value === void 0 ? null : value);
       } catch (error) {
-        host2.complete(id, false, describe2(error));
+        host2.complete(id, false, describe(error));
         return;
       }
       host2.complete(id, true, json);
@@ -19286,7 +19300,7 @@
         const request = await host2.nextRequest();
         if (request == null) break;
         const [id, operation, payloadJson] = request;
-        Promise.resolve().then(() => dispatch(operation, JSON.parse(payloadJson))).then((value) => respond(id, value), (error) => host2.complete(id, false, describe2(error))).catch((error) => host2.log("error", `Plugin response failed: ${describe2(error)}`));
+        Promise.resolve().then(() => dispatch(operation, JSON.parse(payloadJson))).then((value) => respond(id, value), (error) => host2.complete(id, false, describe(error))).catch((error) => host2.log("error", `Plugin response failed: ${describe(error)}`));
       }
       lifetime.abort(new Error("Plugin is inactive"));
       for (const item of subscriptions.splice(0).reverse()) release(item);
