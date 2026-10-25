@@ -5,6 +5,9 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import java.util.Locale
 
+/** How much wider than the narrowest split the later lines may be, as a share of the widest piece. */
+private const val TIE_SHARE = 0.05f
+
 /** Text ready to lay out, with [offsets] mapping each index of the original text into it. */
 internal class LaidOutText(val text: String, val offsets: IntArray)
 
@@ -76,7 +79,10 @@ internal fun balancedLines(original: String, measurer: TextMeasurer, style: Text
         val middle = (low + high) / 2
         if (fromEnd(middle) != null) high = middle else low = middle
     }
-    val breaks = fromEnd(high)?.map { stops[it] } ?: return unchanged
+    // Splits of equal width differ only by rounding in the measured pieces; like desktop, the
+    // tie goes to the later lines, so the first line is the shorter one.
+    val tie = minOf(high + atEnd.max() * TIE_SHARE, room)
+    val breaks = fromEnd(tie)?.map { stops[it] } ?: fromEnd(high)?.map { stops[it] } ?: return unchanged
 
     val result = StringBuilder(text)
     breaks.reversed().forEach { result.insert(it, '\n') }
