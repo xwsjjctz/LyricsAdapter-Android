@@ -187,7 +187,7 @@ private fun VolumeRow(
         if (translatable) TranslateButton(translation, onToggleTranslation)
         val muted = volume == 0f
         IconControl(
-            icon = if (muted) R.drawable.ms_volume_off else R.drawable.ms_volume_down,
+            icon = if (muted) R.drawable.tp_volume_off else R.drawable.tp_volume_down,
             label = stringResource(if (muted) R.string.action_unmute else R.string.action_mute),
             glyph = 22.dp,
             onClick = onToggleMute,
@@ -202,13 +202,13 @@ private fun VolumeRow(
         )
         // With the translate button on the left, the speaker takes a button's width so the slider stays centred.
         Box(if (translatable) Modifier.size(HIT_SIZE) else Modifier, contentAlignment = Alignment.Center) {
-            Glyph(R.drawable.ms_volume_up, 24.dp, Color.White)
+            Glyph(R.drawable.tp_volume_up, 24.dp, Color.White)
         }
         IconControl(
             icon = when (mode) {
-                PlaybackMode.Order -> R.drawable.ms_repeat
-                PlaybackMode.Shuffle -> R.drawable.ms_shuffle
-                PlaybackMode.RepeatOne -> R.drawable.ms_repeat_one
+                PlaybackMode.Order -> R.drawable.tp_repeat
+                PlaybackMode.Shuffle -> R.drawable.tp_shuffle
+                PlaybackMode.RepeatOne -> R.drawable.tp_repeat_one
             },
             label = stringResource(
                 when (mode) {
