@@ -65,6 +65,8 @@ internal class SungLinePainter(
     private val measurer: TextMeasurer,
     private val style: TextStyle,
     private val glowLayer: GraphicsLayer,
+    /** Where each index of [line]'s text sits in the laid-out text, which may hold word joiners. */
+    private val offsets: IntArray,
 ) {
     private val words = line.words
     private val wordEnds: IntArray = words.runningFold(0) { end, word -> end + word.text.length }.drop(1).toIntArray()
@@ -132,7 +134,7 @@ internal class SungLinePainter(
             glowWord = index
         }
         glowLayer.alpha = GLOW_STRENGTH * glow
-        val top = layout.getLineTop(layout.getLineForOffset(startOf(index)))
+        val top = layout.getLineTop(layout.getLineForOffset(offsets[startOf(index)]))
         translate(left = bounds.left - margin, top = top - margin) { drawLayer(glowLayer) }
     }
 
@@ -142,9 +144,9 @@ internal class SungLinePainter(
 
     private fun range(start: Int, end: Int): Pair<Path, Rect> = paths.getOrPut(start.toLong() shl 32 or end.toLong()) {
         val path = Path()
-        rangeRects(layout!!, start, end, OVERHANG).forEach(path::addRect)
+        rangeRects(layout!!, offsets[start], offsets[end], OVERHANG).forEach(path::addRect)
         // The sweep and glow follow the glyphs, not the widened clip.
-        val bounds = rangeRects(layout!!, start, end, overhang = 0f).reduce { union, rect ->
+        val bounds = rangeRects(layout!!, offsets[start], offsets[end], overhang = 0f).reduce { union, rect ->
             Rect(minOf(union.left, rect.left), minOf(union.top, rect.top), maxOf(union.right, rect.right), maxOf(union.bottom, rect.bottom))
         }
         path to bounds

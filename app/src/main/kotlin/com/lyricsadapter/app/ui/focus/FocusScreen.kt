@@ -240,7 +240,7 @@ private fun PortraitHeader(track: Track, modifier: Modifier = Modifier) {
         Column(Modifier.weight(1f)) {
             BasicText(
                 track.title,
-                style = TextStyle(Color.White, 20.sp, FontWeight.ExtraBold, lineHeight = 24.sp, letterSpacing = (-0.025).em),
+                style = TextStyle(Color.White, 20.sp, FontWeight.ExtraBold, fontFamily = FocusFonts.display, lineHeight = 24.sp, letterSpacing = (-0.025).em),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -261,7 +261,7 @@ private fun LandscapeArtwork(track: Track, coverSize: Dp, modifier: Modifier = M
             Spacer(Modifier.height(20.dp))
             BasicText(
                 track.title,
-                style = TextStyle(Color.White, 24.sp, FontWeight.ExtraBold, lineHeight = 29.sp, letterSpacing = (-0.025).em, textAlign = TextAlign.Center),
+                style = TextStyle(Color.White, 24.sp, FontWeight.ExtraBold, fontFamily = FocusFonts.display, lineHeight = 29.sp, letterSpacing = (-0.025).em, textAlign = TextAlign.Center),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -277,14 +277,14 @@ private fun TrackDetails(track: Track, artistSize: Int, centred: Boolean, lineHe
     val align = if (centred) TextAlign.Center else TextAlign.Start
     BasicText(
         track.artist ?: stringResource(R.string.unknown_artist),
-        style = TextStyle(Color.White.copy(alpha = 0.8f), artistSize.sp, FontWeight.SemiBold, lineHeight = (artistSize * lineHeight).sp, textAlign = align),
+        style = TextStyle(Color.White.copy(alpha = 0.8f), artistSize.sp, FontWeight.SemiBold, fontFamily = FocusFonts.text, lineHeight = (artistSize * lineHeight).sp, textAlign = align),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
     track.album?.takeIf(String::isNotBlank)?.let { album ->
         BasicText(
             album,
-            style = TextStyle(Color.White.copy(alpha = 0.4f), 12.sp, FontWeight.Medium, lineHeight = 16.8.sp, textAlign = align),
+            style = TextStyle(Color.White.copy(alpha = 0.4f), 12.sp, FontWeight.Medium, fontFamily = FocusFonts.text, lineHeight = 16.8.sp, textAlign = align),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 4.dp),

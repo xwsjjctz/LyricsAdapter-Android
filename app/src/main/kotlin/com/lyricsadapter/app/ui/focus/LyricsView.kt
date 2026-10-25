@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -61,8 +63,15 @@ import kotlinx.coroutines.launch
 private const val LINE_HEIGHT = 1.2f
 private const val LETTER_SPACING = -0.025f
 
-/** The lyrics' side margins in portrait; desktop's portrait text starts 40px in on a 402px-wide window. */
-val LINE_PADDING = 36.dp
+/** Where the lyrics start in portrait: desktop's text starts 40px in (20px page margin and 20px line padding). */
+val LINE_PADDING = 40.dp
+
+/**
+ * Desktop's lines stop this much further from the right than they start from
+ * the left: AMLL pulls each line out by 6.8px a side and pads it back in, but
+ * the box keeps its padding inside its width.
+ */
+private val LINE_END_EXTRA = 13.6.dp
 
 /** Desktop's blur, measured on its focus mode: 0.8px per line of distance plus one line below the sung one and two above, never past 5px. */
 private const val BLUR_PER_LINE = 0.8f
@@ -76,7 +85,10 @@ private fun lineStyle(fontSize: Int) = TextStyle(
     lineHeight = (fontSize * LINE_HEIGHT).sp,
     letterSpacing = LETTER_SPACING.em,
     fontWeight = FontWeight.Bold,
+    fontFamily = FocusFonts.display,
     color = INACTIVE,
+    // balancedLines() decides where lines break; plain breaking keeps its choice.
+    lineBreak = LineBreak.Simple,
 )
 
 /** The blur of a line [distance] lines from the sung one (negative above it). */
@@ -109,7 +121,7 @@ fun LyricsView(
     controlsShown: () -> Float = { 0f },
     settings: FocusSettings = FocusSettings(),
     anchor: LyricsAnchor = LyricsAnchor.Top,
-    /** How far the text sits from the view's sides. */
+    /** How far the text starts from the view's left side; it ends a little further from the right, as on desktop. */
     linePadding: Dp = LINE_PADDING,
     /** Translated text by line index, shown under each line. */
     translations: Map<Int, String> = emptyMap(),
@@ -254,13 +266,12 @@ private fun LyricLineText(
     val blurTarget = if (scrolling || active) 0f else lineBlur(distance, blurStrength)
     val blur by animateFloatAsState(blurTarget, spring(stiffness = 120f), label = "blur")
     val glowLayer = rememberGraphicsLayer()
-    val painter = remember(line, measurer, glowLayer, style) { SungLinePainter(line, measurer, style, glowLayer) }
 
-    Column(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = linePadding, vertical = gap)
+            .padding(start = linePadding, end = linePadding + LINE_END_EXTRA, top = gap, bottom = gap)
             .graphicsLayer {
                 val scale = 0.97f + 0.03f * emphasis
                 scaleX = scale
@@ -270,8 +281,13 @@ private fun LyricLineText(
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
             },
     ) {
+        val width = constraints.maxWidth
+        // Wrapped as desktop wraps it: between words, into lines of similar width.
+        val laidOut = remember(line, style, width) { balancedLines(line.text, measurer, style, width) }
+        val painter = remember(laidOut, measurer, glowLayer) { SungLinePainter(line, measurer, style, glowLayer, laidOut.offsets) }
+        Column {
         BasicText(
-            text = line.text,
+            text = laidOut.text,
             style = style,
             onTextLayout = painter::onLayout,
             modifier = Modifier.drawWithContent {
@@ -281,11 +297,12 @@ private fun LyricLineText(
         if (translation != null) {
             val translationStyle = remember(style) { translationStyle(style) }
             BasicText(
-                text = translation,
+                text = remember(translation, translationStyle, width) { balancedLines(translation, measurer, translationStyle, width).text },
                 style = translationStyle,
                 // Desktop's translation line sits at 0.3 inside its line, which is at 0.2, or 0.85 while sung.
                 modifier = Modifier.graphicsLayer { alpha = TRANSLATION_ALPHA * (OTHER_LINE_ALPHA + (SUNG_LINE_ALPHA - OTHER_LINE_ALPHA) * emphasis) },
             )
+        }
         }
     }
 }
@@ -298,7 +315,9 @@ private fun translationStyle(style: TextStyle): TextStyle {
         lineHeight = size * 1.2f,
         letterSpacing = (-0.015f).em,
         fontWeight = FontWeight.SemiBold,
+        fontFamily = FocusFonts.text,
         color = Color.White.copy(alpha = 0.96f),
+        lineBreak = LineBreak.Simple,
     )
 }
 

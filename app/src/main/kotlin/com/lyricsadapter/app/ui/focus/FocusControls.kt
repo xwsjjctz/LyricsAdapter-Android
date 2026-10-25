@@ -94,6 +94,7 @@ private val TIME_STYLE = TextStyle(
     fontSize = 12.sp,
     lineHeight = 18.sp,
     fontWeight = FontWeight.SemiBold,
+    fontFamily = FocusFonts.text,
     fontFeatureSettings = "tnum",
 )
 
