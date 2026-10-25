@@ -243,7 +243,7 @@ private fun TranslateButton(status: TranslationStatus, onToggle: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         if (busy) Spinner(18.dp, TRANSLATE_COLOR)
-        else Glyph(R.drawable.ms_translate, 18.dp, if (status == TranslationStatus.Translated) TRANSLATED_COLOR else TRANSLATE_COLOR)
+        else Glyph(R.drawable.tp_translate, 22.dp, if (status == TranslationStatus.Translated) TRANSLATED_COLOR else TRANSLATE_COLOR)
     }
 }
 
