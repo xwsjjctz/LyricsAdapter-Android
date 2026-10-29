@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextMeasurer
@@ -263,9 +262,15 @@ private fun LyricLineText(
 ) {
     val active = distance == 0f
     val emphasis by animateFloatAsState(if (active) 1f else 0f, spring(dampingRatio = 1f, stiffness = 160f), label = "emphasis")
+    // When the line stopped being sung: its words then float back down.
+    var leftAtMs by remember(line) { mutableStateOf<Long?>(null) }
+    var wasActive by remember(line) { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        leftAtMs = if (active) null else if (wasActive) position() else leftAtMs
+        wasActive = active
+    }
     val blurTarget = if (scrolling || active) 0f else lineBlur(distance, blurStrength)
     val blur by animateFloatAsState(blurTarget, spring(stiffness = 120f), label = "blur")
-    val glowLayer = rememberGraphicsLayer()
 
     BoxWithConstraints(
         Modifier
@@ -284,14 +289,14 @@ private fun LyricLineText(
         val width = constraints.maxWidth
         // Wrapped as desktop wraps it: between words, into lines of similar width.
         val laidOut = remember(line, style, width) { balancedLines(line.text, measurer, style, width) }
-        val painter = remember(laidOut, measurer, glowLayer) { SungLinePainter(line, measurer, style, glowLayer, laidOut.offsets) }
+        val painter = remember(laidOut, measurer) { SungLinePainter(line, measurer, style, laidOut.offsets) }
         Column {
         BasicText(
             text = laidOut.text,
             style = style,
             onTextLayout = painter::onLayout,
             modifier = Modifier.drawWithContent {
-                if (emphasis > 0f) painter.draw(this, position(), emphasis) else drawContent()
+                if (!painter.draw(this, position(), emphasis, leftAtMs)) drawContent()
             },
         )
         if (translation != null) {
@@ -329,7 +334,7 @@ private const val OTHER_LINE_ALPHA = 0.2f
  * The [BlurEffect] radius that blurs as much as CSS `blur(sigma)`: CSS takes
  * the Gaussian's deviation, Android a radius it turns into `0.57735 r + 0.5`.
  */
-private fun cssBlurRadius(sigma: Float): Float = ((sigma - 0.5f) / 0.57735f).coerceAtLeast(0f)
+internal fun cssBlurRadius(sigma: Float): Float = ((sigma - 0.5f) / 0.57735f).coerceAtLeast(0f)
 
 /** Desktop's `--focus-lyrics-edge-fade` and portrait bottom fade, each at most a quarter of the view. */
 private val TOP_FADE = 72.dp

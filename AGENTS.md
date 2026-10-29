@@ -6,7 +6,11 @@ and stays the reference for product behaviour and shared formats.
 
 ## Decisions in force
 
-Agreed with the owner on 2026-10-22. Change them only when the owner asks.
+Agreed with the owner on 2026-10-22 (the licence and AMLL port on 2026-10-29).
+Change them only when the owner asks.
+
+- The Android app is licensed AGPL-3.0-only (`LICENSE`), because its
+  focus-mode word animation is ported from AMLL, which is AGPL-3.0-only.
 
 - Native Kotlin with Jetpack Compose for UI and Media3 for playback. Playback,
   queues and the four library slots (local, cloud, online, playlist) live on the
@@ -38,7 +42,7 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `plugin-host/` | Pure Kotlin plugin host: one QuickJS runtime per plugin, JS event loop, host bindings |
 | `plugin-host-spike/` | JVM command line against the live services (`smoke`, `qq-login`) |
 | `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
-| `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns |
+| `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns; `LineMotion` ports AMLL's word float, held-word emphasis and fill sweep, which desktop's focus mode runs, pinned in `LineMotionTest` against values measured on desktop over CDP |
 | `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output) and download file names |
 | `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
 | `app/` | The Android app: SAF import into Room, Media3 playback service, library wall and list, command palette, online downloads, settings and focus mode |
@@ -118,10 +122,12 @@ Vorbis field. Word lyrics follow desktop's `wordLyricsTagService.ts`.
   `derivedStateOf`, so a frame redraws without recomposing; the spike's
   `LyricsView` keeps the UI thread under 3 ms per frame this way.
 - Blur and the AGSL background must stay switchable for slower devices.
-- The same rule covers AMLL's player (`@applemusic-like-lyrics/core`), which
-  desktop's focus mode uses: match what desktop's focus mode shows (measure it
-  in the running app over CDP, as sizes, alphas, blur and timings), and write
-  the Compose code yourself; do not port its source.
+- AMLL's player (`@applemusic-like-lyrics/core`), which desktop's focus mode
+  uses, may be ported: `lyrics/.../LineMotion.kt` ports its word animations
+  from the version desktop runs (the source is in that package's source map).
+  Ported files name the AMLL files they follow and keep its AGPL notice.
+  Check the result against desktop's running focus mode over CDP, as sizes,
+  alphas, blur and timings, and pin what desktop shows in tests.
 
 ## Matching desktop behaviour
 
