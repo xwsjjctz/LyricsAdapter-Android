@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsContext
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
@@ -11,18 +12,25 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.layer.CompositingStrategy
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import com.lyricsadapter.lyrics.Emphasis
 import com.lyricsadapter.lyrics.FLOAT_EM
 import com.lyricsadapter.lyrics.LineMotion
 import com.lyricsadapter.lyrics.LyricLine
 import com.lyricsadapter.lyrics.Sweep
 import com.lyricsadapter.lyrics.WORD_FADE_WIDTH
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /*
  * Desktop's alphas, as its focus mode renders them: text is white at 0.96;
@@ -41,6 +49,10 @@ private val WHOLE_LINE = SUNG
 /** Glows fainter than this are not drawn. */
 private const val MIN_GLOW = 0.004f
 
+/** Room around a moving word's glyphs in its layer, and around a held letter's for its glow, in ems. */
+private const val WORD_MARGIN = 0.25f
+private const val LETTER_MARGIN = 0.5f
+
 /**
  * Draws one line while it is or was being sung, moving its words as AMLL
  * does on desktop ([LineMotion]): each word floats up as it starts and the
@@ -51,6 +63,13 @@ private const val MIN_GLOW = 0.004f
  * Words that have settled are drawn in one go, and so are words not reached
  * yet; only the words still moving are drawn one by one. Clip shapes, word
  * widths and the letters of held words are laid out once per layout.
+ *
+ * Text drawn under a plain translation lands on whole pixels, so a rise of a
+ * few pixels would move in steps. Each moving word and held letter is drawn
+ * into its own offscreen layer instead, as desktop's browser composites each
+ * `will-change: transform` word, and the layer is moved by fractions of a
+ * pixel; it is redrawn only when its fill or glow changes. [release] frees
+ * the layers.
  */
 internal class SungLinePainter(
     private val line: LyricLine,
@@ -58,6 +77,7 @@ internal class SungLinePainter(
     private val style: TextStyle,
     /** Where each index of [line]'s text sits in the laid-out text, which may hold word joiners. */
     private val offsets: IntArray,
+    private val graphics: GraphicsContext,
 ) {
     private val wordTimed = line.words.isNotEmpty() && line.words.sumOf { it.text.length } == line.text.length
     private val motion = if (wordTimed) LineMotion(line) else null
@@ -78,6 +98,15 @@ internal class SungLinePainter(
     private var placed: Placed? = null
     private val ranges = HashMap<Long, TextRange>()
     private val letterLayouts = HashMap<IntRange, TextLayoutResult>()
+
+    /** Layers of the words (keyed by their first index) and held letters (by their first index, negated) now moving. */
+    private val layers = HashMap<Int, Slot>()
+
+    private class Slot(val layer: GraphicsLayer) {
+        /** What the layer was last drawn with, to redraw it only when that changes. */
+        var content = Long.MIN_VALUE
+        var used = false
+    }
 
     /** Where the drawn words sit in the layout, and the fill across them. */
     private class Placed(val left: FloatArray, val width: FloatArray, val sweep: Sweep)
@@ -120,6 +149,8 @@ internal class SungLinePainter(
         }
         val colors = Colors(lerp(INACTIVE, SUNG, emphasis), lerp(INACTIVE, UPCOMING, emphasis))
         val em = style.fontSize.toPx()
+        // Whole pixels, so a word that has floated up lands where the settled words are drawn.
+        val lift = (FLOAT_EM * em).roundToInt().toFloat()
         val fade = placed.sweep.width
         val states = IntArray(drawn.size) { index ->
             val atomIndex = drawn[index]
@@ -136,11 +167,35 @@ internal class SungLinePainter(
         val waiting = states.indexOfLast { it != WAITING } + 1
 
         if (settled > 0) {
-            translate(top = -FLOAT_EM * em) { clip(range(0, atoms[drawn[settled - 1]].end)) { drawText(layout, color = colors.sung) } }
+            translate(top = -lift) { clip(range(0, atoms[drawn[settled - 1]].end)) { drawText(layout, color = colors.sung) } }
         }
         if (waiting < drawn.size) clip(range(atoms[drawn[waiting]].start, line.text.length)) { drawText(layout, color = colors.upcoming) }
-        for (index in settled until waiting) drawWord(layout, motion, placed, index, positionMs, leftAtMs, emphasis, em, colors)
+        for (index in settled until waiting) drawWord(layout, motion, placed, index, positionMs, leftAtMs, emphasis, em, lift, colors)
+        releaseUnused()
         return true
+    }
+
+    /** Frees every layer; the painter makes new ones if it draws again. */
+    fun release() {
+        layers.values.forEach { graphics.releaseGraphicsLayer(it.layer) }
+        layers.clear()
+    }
+
+    private fun slot(key: Int): Slot = layers.getOrPut(key) {
+        Slot(graphics.createGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen })
+    }.also { it.used = true }
+
+    private fun releaseUnused() {
+        val iterator = layers.values.iterator()
+        while (iterator.hasNext()) {
+            val slot = iterator.next()
+            if (slot.used) {
+                slot.used = false
+            } else {
+                graphics.releaseGraphicsLayer(slot.layer)
+                iterator.remove()
+            }
+        }
     }
 
     private class Colors(val sung: Color, val upcoming: Color)
@@ -154,6 +209,7 @@ internal class SungLinePainter(
         leftAtMs: Long?,
         emphasis: Float,
         em: Float,
+        lift: Float,
         colors: Colors,
     ) {
         val atom = atoms[drawn[index]]
@@ -165,34 +221,82 @@ internal class SungLinePainter(
             edgeAt + fade / 2 <= placed.left[index] -> SolidColor(colors.upcoming)
             else -> Brush.horizontalGradient(0f to colors.sung, 1f to colors.upcoming, startX = edgeAt - fade / 2 - shift, endX = edgeAt + fade / 2 - shift)
         }
-        translate(top = -FLOAT_EM * em * motion.float(drawn[index], positionMs, leftAtMs)) {
+        val edgeKey = when {
+            edgeAt - fade / 2 >= placed.left[index] + placed.width[index] -> 1L
+            edgeAt + fade / 2 <= placed.left[index] -> 2L
+            else -> (edgeAt * 4).roundToInt().toLong() shl 2
+        }
+        val colorKey = colors.sung.value.toLong() * 31 + colors.upcoming.value.toLong()
+        val lineIndex = layout.getLineForOffset(offsets[atom.start])
+        translate(top = -lift * motion.float(drawn[index], positionMs, leftAtMs)) {
             val letters = held[index]
             if (letters == null) {
-                // Without an explicit alpha the paint keeps the last colour's, and the gradient is dimmed twice.
-                clip(range(atom.start, atom.end)) { drawText(layout, brush = brush(0f), alpha = 1f) }
+                val margin = em * WORD_MARGIN
+                val bounds = pixelBounds(
+                    placed.left[index] - margin, layout.getLineTop(lineIndex) - margin,
+                    placed.left[index] + placed.width[index] + margin, layout.getLineBottom(lineIndex) + margin,
+                )
+                val slot = slot(atom.start)
+                val content = edgeKey * 31 + colorKey
+                if (slot.content != content || slot.layer.size != bounds.size) {
+                    slot.content = content
+                    slot.layer.record(bounds.size) {
+                        translate(-bounds.offset.x.toFloat(), -bounds.offset.y.toFloat()) {
+                            // Without an explicit alpha the paint keeps the last colour's, and the gradient is dimmed twice.
+                            clip(range(atom.start, atom.end)) { drawText(layout, brush = brush(0f), alpha = 1f) }
+                        }
+                    }
+                }
+                slot.layer.topLeft = bounds.offset
+                drawLayer(slot.layer)
             } else {
                 val (word, own) = letters
+                val margin = em * LETTER_MARGIN
                 for (letter in own) {
                     val range = word.letters[letter]
                     val box = layout.getBoundingBox(offsets[range.first])
                     val laidOut = letterLayouts.getOrPut(range) {
                         measurer.measure(line.text.substring(range.first, range.last + 1), style, softWrap = false, maxLines = 1)
                     }
-                    val top = layout.getLineBaseline(layout.getLineForOffset(offsets[range.first])) - laidOut.firstBaseline
+                    val top = layout.getLineBaseline(lineIndex) - laidOut.firstBaseline
                     // Desktop's mask dims the glow ahead of the fill as it dims the text.
                     val lit = ((edgeAt + fade / 2 - box.center.x) / fade).coerceIn(0f, 1f)
                     val glow = word.glowAlpha(letter, positionMs) * SUNG_LINE_ALPHA * emphasis * (UPCOMING_SHARE + (1 - UPCOMING_SHARE) * lit)
-                    val shadow = if (glow < MIN_GLOW) null else Shadow(Color.White.copy(alpha = glow), Offset.Zero, cssShadowRadius(word.glowRadiusEm * em))
-                    val scale = word.scale(letter, positionMs)
-                    withTransform({
-                        translate(word.spreadEm(letter, positionMs) * em * scale, -word.riseEm(letter, positionMs) * em * scale)
-                        scale(scale, scale, pivot = box.center)
-                    }) {
-                        drawText(laidOut, brush = brush(box.left), topLeft = Offset(box.left, top), alpha = 1f, shadow = shadow)
+                    val glowKey = if (glow < MIN_GLOW) 0L else (glow * 255).roundToInt().toLong()
+                    val bounds = pixelBounds(box.left - margin, layout.getLineTop(lineIndex) - margin, box.right + margin, layout.getLineBottom(lineIndex) + margin)
+                    val slot = slot(-1 - range.first)
+                    val content = (edgeKey * 31 + colorKey) * 257 + glowKey
+                    if (slot.content != content || slot.layer.size != bounds.size) {
+                        slot.content = content
+                        val shadow = if (glowKey == 0L) null else Shadow(Color.White.copy(alpha = glow), Offset.Zero, cssShadowRadius(word.glowRadiusEm * em))
+                        slot.layer.record(bounds.size) {
+                            translate(-bounds.offset.x.toFloat(), -bounds.offset.y.toFloat()) {
+                                drawText(laidOut, brush = brush(box.left), topLeft = Offset(box.left, top), alpha = 1f, shadow = shadow)
+                            }
+                        }
                     }
+                    val scale = word.scale(letter, positionMs)
+                    slot.layer.apply {
+                        topLeft = bounds.offset
+                        pivotOffset = box.center - Offset(bounds.offset.x.toFloat(), bounds.offset.y.toFloat())
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = word.spreadEm(letter, positionMs) * em * scale
+                        translationY = -word.riseEm(letter, positionMs) * em * scale
+                    }
+                    drawLayer(slot.layer)
                 }
             }
         }
+    }
+
+    /** The whole-pixel box around a rectangle, so a layer's content sits where the text would be drawn directly. */
+    private class PixelBounds(val offset: IntOffset, val size: IntSize)
+
+    private fun pixelBounds(left: Float, top: Float, right: Float, bottom: Float): PixelBounds {
+        val x = floor(left).toInt()
+        val y = floor(top).toInt()
+        return PixelBounds(IntOffset(x, y), IntSize(ceil(right).toInt() - x, ceil(bottom).toInt() - y))
     }
 
     private fun range(start: Int, end: Int): TextRange = ranges.getOrPut(start.toLong() shl 32 or end.toLong()) {

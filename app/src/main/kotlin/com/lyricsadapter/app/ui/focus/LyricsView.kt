@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -282,6 +284,8 @@ private fun LyricLineText(
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0.5f)
+                // Offscreen, the line moves by fractions of a pixel while it scrolls instead of in whole-pixel steps.
+                compositingStrategy = CompositingStrategy.Offscreen
                 val radius = cssBlurRadius(blur.dp.toPx())
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
             },
@@ -289,7 +293,9 @@ private fun LyricLineText(
         val width = constraints.maxWidth
         // Wrapped as desktop wraps it: between words, into lines of similar width.
         val laidOut = remember(line, style, width) { balancedLines(line.text, measurer, style, width) }
-        val painter = remember(laidOut, measurer) { SungLinePainter(line, measurer, style, laidOut.offsets) }
+        val graphics = LocalGraphicsContext.current
+        val painter = remember(laidOut, measurer, graphics) { SungLinePainter(line, measurer, style, laidOut.offsets, graphics) }
+        DisposableEffect(painter) { onDispose(painter::release) }
         Column {
         BasicText(
             text = laidOut.text,

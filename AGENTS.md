@@ -122,6 +122,11 @@ Vorbis field. Word lyrics follow desktop's `wordLyricsTagService.ts`.
   `derivedStateOf`, so a frame redraws without recomposing; the spike's
   `LyricsView` keeps the UI thread under 3 ms per frame this way.
 - Blur and the AGSL background must stay switchable for slower devices.
+- Text drawn under a plain translation lands on whole pixels, so slow
+  motion of a few pixels (a word floating up, a line settling) moves in
+  visible one-pixel steps. Move such text as an offscreen layer instead, as
+  `SungLinePainter` does for moving words and letters and `LyricsView` for
+  each line; check with a screen recording that it moves every frame.
 - AMLL's player (`@applemusic-like-lyrics/core`), which desktop's focus mode
   uses, may be ported: `lyrics/.../LineMotion.kt` ports its word animations
   from the version desktop runs (the source is in that package's source map).
