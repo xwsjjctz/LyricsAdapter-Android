@@ -49,6 +49,9 @@ private val WHOLE_LINE = SUNG
 /** Glows fainter than this are not drawn. */
 private const val MIN_GLOW = 0.004f
 
+/** The colour a held letter is drawn in for its glow alone: the line's layout draws the letter itself. */
+private val GLOW_SOURCE = Color.White.copy(alpha = 1f / 255)
+
 /** Room around a moving word's glyphs in its layer, and around a held letter's for its glow, in ems. */
 private const val WORD_MARGIN = 0.25f
 private const val LETTER_MARGIN = 0.5f
@@ -271,7 +274,13 @@ internal class SungLinePainter(
                         val shadow = if (glowKey == 0L) null else Shadow(Color.White.copy(alpha = glow), Offset.Zero, cssShadowRadius(word.glowRadiusEm * em))
                         slot.layer.record(bounds.size) {
                             translate(-bounds.offset.x.toFloat(), -bounds.offset.y.toFloat()) {
-                                drawText(laidOut, brush = brush(box.left), topLeft = Offset(box.left, top), alpha = 1f, shadow = shadow)
+                                // The glow comes from the letter on its own, drawn all but invisibly: a
+                                // shadow that is not opaque keeps its own alpha.
+                                if (shadow != null) drawText(laidOut, color = GLOW_SOURCE, topLeft = Offset(box.left, top), shadow = shadow)
+                                // The letter itself is cut from the line's layout, so it is drawn exactly as the
+                                // line draws it at rest: laid out alone, a letter loses its kerning and ligatures
+                                // and would jump when the word starts and stops moving.
+                                clip(range(range.first, range.last + 1)) { drawText(layout, brush = brush(0f), alpha = 1f) }
                             }
                         }
                     }
