@@ -1,13 +1,15 @@
 package com.lyricsadapter.app.ui.focus
 
+import android.os.Build
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsContext
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -17,7 +19,6 @@ import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.IntOffset
@@ -49,8 +50,8 @@ private val WHOLE_LINE = SUNG
 /** Glows fainter than this are not drawn. */
 private const val MIN_GLOW = 0.004f
 
-/** The colour a held letter is drawn in for its glow alone: the line's layout draws the letter itself. */
-private val GLOW_SOURCE = Color.White.copy(alpha = 1f / 255)
+/** Keys of the held letters' glow layers, below every letter's own key. */
+private const val GLOW_KEYS = -1_000_000
 
 /** Room around a moving word's glyphs in its layer, and around a held letter's for its glow, in ems. */
 private const val WORD_MARGIN = 0.25f
@@ -64,19 +65,19 @@ private const val LETTER_MARGIN = 0.5f
  * down. [draw] returns false while the line is at rest, to be drawn plainly.
  *
  * Words that have settled are drawn in one go, and so are words not reached
- * yet; only the words still moving are drawn one by one. Clip shapes, word
- * widths and the letters of held words are laid out once per layout.
+ * yet; only the words still moving are drawn one by one. Clip shapes and
+ * word widths are worked out once per layout.
  *
  * Text drawn under a plain translation lands on whole pixels, so a rise of a
  * few pixels would move in steps. Each moving word and held letter is drawn
  * into its own offscreen layer instead, as desktop's browser composites each
  * `will-change: transform` word, and the layer is moved by fractions of a
- * pixel; it is redrawn only when its fill or glow changes. [release] frees
- * the layers.
+ * pixel; it is redrawn only when its fill changes. A glowing letter's glow
+ * is a blurred copy in a layer of its own, whose opacity follows the glow.
+ * [release] frees the layers.
  */
 internal class SungLinePainter(
     private val line: LyricLine,
-    private val measurer: TextMeasurer,
     private val style: TextStyle,
     /** Where each index of [line]'s text sits in the laid-out text, which may hold word joiners. */
     private val offsets: IntArray,
@@ -100,9 +101,8 @@ internal class SungLinePainter(
     private var layout: TextLayoutResult? = null
     private var placed: Placed? = null
     private val ranges = HashMap<Long, TextRange>()
-    private val letterLayouts = HashMap<IntRange, TextLayoutResult>()
-
-    /** Layers of the words (keyed by their first index) and held letters (by their first index, negated) now moving. */
+    
+    /** Layers of the moving words (keyed by their first index), held letters (by it negated) and their glows. */
     private val layers = HashMap<Int, Slot>()
 
     private class Slot(val layer: GraphicsLayer) {
@@ -117,7 +117,6 @@ internal class SungLinePainter(
     fun onLayout(result: TextLayoutResult) {
         layout = result
         ranges.clear()
-        letterLayouts.clear()
         placed = motion?.let { motion ->
             val left = FloatArray(drawn.size)
             val width = FloatArray(drawn.size)
@@ -258,41 +257,50 @@ internal class SungLinePainter(
                 for (letter in own) {
                     val range = word.letters[letter]
                     val box = layout.getBoundingBox(offsets[range.first])
-                    val laidOut = letterLayouts.getOrPut(range) {
-                        measurer.measure(line.text.substring(range.first, range.last + 1), style, softWrap = false, maxLines = 1)
-                    }
-                    val top = layout.getLineBaseline(lineIndex) - laidOut.firstBaseline
-                    // Desktop's mask dims the glow ahead of the fill as it dims the text.
-                    val lit = ((edgeAt + fade / 2 - box.center.x) / fade).coerceIn(0f, 1f)
-                    val glow = word.glowAlpha(letter, positionMs) * SUNG_LINE_ALPHA * emphasis * (UPCOMING_SHARE + (1 - UPCOMING_SHARE) * lit)
-                    val glowKey = if (glow < MIN_GLOW) 0L else (glow * 255).roundToInt().toLong()
                     val bounds = pixelBounds(box.left - margin, layout.getLineTop(lineIndex) - margin, box.right + margin, layout.getLineBottom(lineIndex) + margin)
-                    val slot = slot(-1 - range.first)
-                    val content = (edgeKey * 31 + colorKey) * 257 + glowKey
-                    if (slot.content != content || slot.layer.size != bounds.size) {
-                        slot.content = content
-                        val shadow = if (glowKey == 0L) null else Shadow(Color.White.copy(alpha = glow), Offset.Zero, cssShadowRadius(word.glowRadiusEm * em))
-                        slot.layer.record(bounds.size) {
-                            translate(-bounds.offset.x.toFloat(), -bounds.offset.y.toFloat()) {
-                                // The glow comes from the letter on its own, drawn all but invisibly: a
-                                // shadow that is not opaque keeps its own alpha.
-                                if (shadow != null) drawText(laidOut, color = GLOW_SOURCE, topLeft = Offset(box.left, top), shadow = shadow)
-                                // The letter itself is cut from the line's layout, so it is drawn exactly as the
-                                // line draws it at rest: laid out alone, a letter loses its kerning and ligatures
-                                // and would jump when the word starts and stops moving.
-                                clip(range(range.first, range.last + 1)) { drawText(layout, brush = brush(0f), alpha = 1f) }
-                            }
-                        }
-                    }
+                    val origin = Offset(bounds.offset.x.toFloat(), bounds.offset.y.toFloat())
+                    val cell = range(range.first, range.last + 1)
                     val scale = word.scale(letter, positionMs)
-                    slot.layer.apply {
+                    fun GraphicsLayer.place() {
                         topLeft = bounds.offset
-                        pivotOffset = box.center - Offset(bounds.offset.x.toFloat(), bounds.offset.y.toFloat())
+                        pivotOffset = box.center - origin
                         scaleX = scale
                         scaleY = scale
                         translationX = word.spreadEm(letter, positionMs) * em * scale
                         translationY = -word.riseEm(letter, positionMs) * em * scale
                     }
+                    // Desktop's mask dims the glow ahead of the fill as it dims the text.
+                    val lit = ((edgeAt + fade / 2 - box.center.x) / fade).coerceIn(0f, 1f)
+                    val glow = word.glowAlpha(letter, positionMs) * SUNG_LINE_ALPHA * emphasis * (UPCOMING_SHARE + (1 - UPCOMING_SHARE) * lit)
+                    if (glow >= MIN_GLOW && Build.VERSION.SDK_INT >= 31) {
+                        // Desktop's text-shadow: the letter in white, blurred, under the letter. Drawn once
+                        // into its own layer; only the layer's opacity follows the glow.
+                        val radius = cssShadowRadius(word.glowRadiusEm * em)
+                        val glowSlot = slot(GLOW_KEYS - range.first)
+                        val content = radius.toRawBits().toLong()
+                        if (glowSlot.content != content || glowSlot.layer.size != bounds.size) {
+                            glowSlot.content = content
+                            glowSlot.layer.record(bounds.size) {
+                                translate(-origin.x, -origin.y) { clip(cell) { drawText(layout, color = Color.White) } }
+                            }
+                            glowSlot.layer.renderEffect = BlurEffect(radius, radius, TileMode.Decal)
+                        }
+                        glowSlot.layer.alpha = glow
+                        glowSlot.layer.place()
+                        drawLayer(glowSlot.layer)
+                    }
+                    val slot = slot(-1 - range.first)
+                    val content = edgeKey * 31 + colorKey
+                    if (slot.content != content || slot.layer.size != bounds.size) {
+                        slot.content = content
+                        slot.layer.record(bounds.size) {
+                            // Cut from the line's layout, so the letter is drawn exactly as the line draws it at
+                            // rest: laid out alone, it would lose its kerning and ligatures and jump when the
+                            // word starts and stops moving.
+                            translate(-origin.x, -origin.y) { clip(cell) { drawText(layout, brush = brush(0f), alpha = 1f) } }
+                        }
+                    }
+                    slot.layer.place()
                     drawLayer(slot.layer)
                 }
             }
@@ -326,7 +334,7 @@ private const val SETTLED = 0
 private const val WAITING = 1
 private const val MOVING = 2
 
-/** The text-shadow radius that blurs as much as a CSS text-shadow of [cssRadius]: CSS blurs by half its radius. */
+/** The blur radius that blurs as much as a CSS text-shadow of [cssRadius]: CSS blurs by half its radius. */
 private fun cssShadowRadius(cssRadius: Float): Float = cssBlurRadius(cssRadius / 2)
 
 /** Where one line's band ends, as a share of the way to the next baseline: below CJK and Latin descenders, above the next line's glyphs. */

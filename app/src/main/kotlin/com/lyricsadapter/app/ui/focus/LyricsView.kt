@@ -278,23 +278,25 @@ private fun LyricLineText(
         Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(start = linePadding, end = linePadding + LINE_END_EXTRA, top = gap, bottom = gap)
             .graphicsLayer {
                 val scale = 0.97f + 0.03f * emphasis
                 scaleX = scale
                 scaleY = scale
-                transformOrigin = TransformOrigin(0f, 0.5f)
+                // About where the text starts.
+                transformOrigin = TransformOrigin(if (size.width > 0f) linePadding.toPx() / size.width else 0f, 0.5f)
                 // Offscreen, the line moves by fractions of a pixel while it scrolls instead of in whole-pixel steps.
+                // The layer takes in the padding, so words floating up, swelling and glowing are not cut off.
                 compositingStrategy = CompositingStrategy.Offscreen
                 val radius = cssBlurRadius(blur.dp.toPx())
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
-            },
+            }
+            .padding(start = linePadding, end = linePadding + LINE_END_EXTRA, top = gap, bottom = gap),
     ) {
         val width = constraints.maxWidth
         // Wrapped as desktop wraps it: between words, into lines of similar width.
         val laidOut = remember(line, style, width) { balancedLines(line.text, measurer, style, width) }
         val graphics = LocalGraphicsContext.current
-        val painter = remember(laidOut, measurer, graphics) { SungLinePainter(line, measurer, style, laidOut.offsets, graphics) }
+        val painter = remember(laidOut, measurer, graphics) { SungLinePainter(line, style, laidOut.offsets, graphics) }
         DisposableEffect(painter) { onDispose(painter::release) }
         Column {
         BasicText(
