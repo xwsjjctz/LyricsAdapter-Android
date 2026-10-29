@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -132,7 +133,11 @@ fun FocusScreen(
                 lyrics.isSynced -> LyricsView(
                     lines = lyrics.lines,
                     position = { clock.positionMs },
-                    onLineClick = { line -> seek(line.startMs) },
+                    // A tap on a line is a wish to hear it, as on desktop: it also starts playback.
+                    onLineClick = { line ->
+                        seek(line.startMs)
+                        player.resume()
+                    },
                     modifier = Modifier.fillMaxSize(),
                     controlsHeight = controlsSpace,
                     controlsShown = { controlsAlpha },
@@ -156,6 +161,8 @@ fun FocusScreen(
             }
         }
     }
+    // Only composed while they show at all, so hidden controls leave the lyrics under them to the finger.
+    val controlsComposed by remember { derivedStateOf { controlsAlpha > 0f } }
     val controls: @Composable (Modifier) -> Unit = { modifier ->
         FocusControls(
             position = { clock.positionMs },
@@ -176,6 +183,13 @@ fun FocusScreen(
             modifier = modifier.wakesControls(idle).graphicsLayer { alpha = controlsAlpha },
         )
     }
+    /** The controls, with [below] more room under them; while hidden, touches from their transport row down reveal them. */
+    val controlsArea: @Composable (Modifier, Dp) -> Unit = { modifier, below ->
+        Box(modifier.fillMaxWidth().height(FOCUS_CONTROLS_HEIGHT + below)) {
+            if (controlsComposed) controls(Modifier.align(Alignment.TopCenter))
+            if (!idle.shown) Box(Modifier.fillMaxSize().padding(top = FOCUS_CONTROLS_WAKE_TOP).wakesControls(idle))
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().blocksTouches().graphicsLayer { translationY = dismiss }) {
         if (settings.flowingBackground && flowingBackgroundSupported) {
@@ -193,7 +207,7 @@ fun FocusScreen(
             ) {
                 Box(Modifier.weight(LANDSCAPE_ARTWORK_WEIGHT).fillMaxHeight()) {
                     LandscapeArtwork(track, cover, Modifier.fillMaxSize().graphicsLayer { alpha = 1f - controlsAlpha }.then(dismissDrag))
-                    controls(Modifier.align(Alignment.Center))
+                    controlsArea(Modifier.align(Alignment.Center), 0.dp)
                     // Over the artwork, so it never covers the lyrics.
                     Grabber(onClose, Modifier.align(Alignment.TopCenter))
                 }
@@ -210,7 +224,7 @@ fun FocusScreen(
                 PortraitHeader(track, dismissDrag)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     lyricsPane(Modifier.fillMaxSize(), CONTROLS_SPACE, LyricsAnchor.Top, LINE_PADDING)
-                    controls(Modifier.align(Alignment.BottomCenter).padding(bottom = FOCUS_CONTROLS_BOTTOM))
+                    controlsArea(Modifier.align(Alignment.BottomCenter), FOCUS_CONTROLS_BOTTOM)
                 }
             }
         }

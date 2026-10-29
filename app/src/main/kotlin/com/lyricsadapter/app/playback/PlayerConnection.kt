@@ -98,6 +98,11 @@ class PlayerConnection(private val context: Context) {
         controller?.seekTo(positionMs)
     }
 
+    /** Plays from where playback stands; nothing when it already plays. */
+    fun resume() {
+        controller?.play()
+    }
+
     fun cyclePlaybackMode() {
         val player = controller ?: return
         when (modeOf(player)) {

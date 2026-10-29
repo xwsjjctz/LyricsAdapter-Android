@@ -55,7 +55,14 @@ private const val GLOW_KEYS = -1_000_000
 
 /** Room around a moving word's glyphs in its layer, and around a held letter's for its glow, in ems. */
 private const val WORD_MARGIN = 0.25f
-private const val LETTER_MARGIN = 0.5f
+private const val LETTER_MARGIN = 0.7f
+
+/**
+ * The glow is brighter and wider than desktop's at the owner's request
+ * (2026-10-29): desktop's reads as too faint on a phone.
+ */
+private const val GLOW_GAIN = 2f
+private const val GLOW_WIDENING = 1.5f
 
 /**
  * Draws one line while it is or was being sung, moving its words as AMLL
@@ -271,11 +278,11 @@ internal class SungLinePainter(
                     }
                     // Desktop's mask dims the glow ahead of the fill as it dims the text.
                     val lit = ((edgeAt + fade / 2 - box.center.x) / fade).coerceIn(0f, 1f)
-                    val glow = word.glowAlpha(letter, positionMs) * SUNG_LINE_ALPHA * emphasis * (UPCOMING_SHARE + (1 - UPCOMING_SHARE) * lit)
+                    val glow = (GLOW_GAIN * word.glowAlpha(letter, positionMs) * SUNG_LINE_ALPHA * emphasis * (UPCOMING_SHARE + (1 - UPCOMING_SHARE) * lit)).coerceAtMost(1f)
                     if (glow >= MIN_GLOW && Build.VERSION.SDK_INT >= 31) {
                         // Desktop's text-shadow: the letter in white, blurred, under the letter. Drawn once
                         // into its own layer; only the layer's opacity follows the glow.
-                        val radius = cssShadowRadius(word.glowRadiusEm * em)
+                        val radius = cssShadowRadius(GLOW_WIDENING * word.glowRadiusEm * em)
                         val glowSlot = slot(GLOW_KEYS - range.first)
                         val content = radius.toRawBits().toLong()
                         if (glowSlot.content != content || glowSlot.layer.size != bounds.size) {

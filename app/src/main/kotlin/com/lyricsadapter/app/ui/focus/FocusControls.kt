@@ -77,6 +77,9 @@ private val SIDE_MARGIN = 20.dp
 private val ROW_GAP = 12.dp
 private val PROGRESS_ROW = 62.dp
 private val VOLUME_ROW = 44.dp
+
+/** While the controls are hidden, touches from the transport row down reveal them; the progress row is left to the lyrics. */
+internal val FOCUS_CONTROLS_WAKE_TOP = PROGRESS_ROW + ROW_GAP
 private val HIT_SIZE = 44.dp
 
 private val TRACK_COLOR = Color.White.copy(alpha = 0.24f)
