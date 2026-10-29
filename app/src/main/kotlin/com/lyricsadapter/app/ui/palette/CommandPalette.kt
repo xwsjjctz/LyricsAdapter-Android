@@ -260,7 +260,7 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
                         trailing = {
                             val done = row.song.trackId in added
                             IconButton(
-                                if (done) R.drawable.ui_check else R.drawable.ic_add,
+                                if (done) R.drawable.ui_check else R.drawable.ui_add,
                                 stringResource(if (done) R.string.added_to_online else R.string.add_to_online),
                                 tint = colors.accent,
                                 size = 20.dp,
@@ -300,7 +300,7 @@ fun CommandPalette(music: PaletteMusic, commands: List<PaletteCommand>, initialM
                 DownloadQuality.entries.forEach { quality -> add(MenuEntry.Item(quality.label, R.drawable.ui_download) { music.download(song, quality) }) }
                 add(MenuEntry.Separator)
                 add(
-                    MenuEntry.Item(stringResource(if (done) R.string.added_to_online else R.string.add_to_online), if (done) R.drawable.ui_check else R.drawable.ic_add) {
+                    MenuEntry.Item(stringResource(if (done) R.string.added_to_online else R.string.add_to_online), if (done) R.drawable.ui_check else R.drawable.ui_add) {
                         if (!done) {
                             music.addOnline(song)
                             added = added + song.trackId

@@ -51,11 +51,11 @@ fun MiniPlayer(track: Track, isPlaying: Boolean, onTogglePlay: () -> Unit, onNex
             )
         }
         IconButton(
-            icon = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+            icon = if (isPlaying) R.drawable.ui_pause_filled else R.drawable.ui_play_arrow_filled,
             label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
             tint = colors.text,
             onClick = onTogglePlay,
         )
-        IconButton(R.drawable.ic_next, stringResource(R.string.action_next), tint = colors.text, onClick = onNext)
+        IconButton(R.drawable.ui_skip_next_filled, stringResource(R.string.action_next), tint = colors.text, onClick = onNext)
     }
 }

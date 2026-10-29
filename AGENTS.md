@@ -43,6 +43,7 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
 | `app/` | The Android app: SAF import into Room, Media3 playback service, library wall and list, command palette, online downloads, settings and focus mode |
 | `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
+| `tools/icons/` | `generate.py` writes the `ui_*`/`ms_*` drawables from desktop's Material Symbols Rounded font (`node_modules/material-symbols`) at the axes desktop's CSS uses: FILL 0 opsz 24 by default, FILL 1 opsz 48 in focus mode |
 | `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
 | `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
 
@@ -59,6 +60,7 @@ node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cas
 ./gradlew :app:installProfile                    # release code (R8) under the debug id and key, for measuring speed
 ./gradlew :app:assembleRelease                   # signed when keystore.properties exists at the root (never committed)
 python3 tools/i18n/generate.py                   # after changing values/strings.xml
+python3 tools/icons/generate.py ../LyricsAdapter # after adding an icon; needs fonttools and brotli
 ./gradlew :spike-android:connectedDebugAndroidTest
 ```
 
