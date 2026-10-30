@@ -180,9 +180,14 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
     // Kept while the menu closes, so it can animate out; state, so the veil goes with it once closed.
     var shown by remember { mutableStateOf<MenuRequest?>(null) }
     if (request != null && shown !== request) shown = request
+    // The real glass fades in once the panel stands still; see SettlingGlass.
+    var settled by remember { mutableStateOf(false) }
     LaunchedEffect(request != null) {
+        settled = false
         state.progress.animateTo(if (request != null) 1f else 0f, spring(dampingRatio = 0.78f, stiffness = 520f))
-        if (request == null) {
+        if (request != null) {
+            settled = true
+        } else {
             shown = null
             state.itemBounds.clear()
         }
@@ -237,7 +242,7 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
                 layout(constraints.maxWidth, constraints.maxHeight) { panel.place(x, y) }
             },
     ) {
-        Column(
+        Box(
             Modifier
                 .graphicsLayer {
                     val p = progress.value
@@ -249,52 +254,56 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
                     transformOrigin = TransformOrigin(if (leftwards) 0.85f else 0.15f, if (below) 0f else 1f)
                 }
                 .width(PANEL_WIDTH)
-                .heightIn(max = 520.dp)
-                .glass(backdrop, PANEL_SHAPE, lens = 10.dp)
-                .clip(PANEL_SHAPE)
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 6.dp),
+                .heightIn(max = 520.dp),
         ) {
-            val checkable = menu.entries.any { it is MenuEntry.Item && it.checked }
-            menu.entries.forEachIndexed { index, entry ->
-                when (entry) {
-                    MenuEntry.Separator -> Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(0.5.dp).background(colors.divider))
-                    is MenuEntry.Label -> BasicText(
-                        entry.text,
-                        style = TextStyle(color = colors.secondaryText, fontSize = 13.sp),
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
-                    )
-                    is MenuEntry.Item -> {
-                        val tint = if (entry.danger) colors.danger else colors.text
-                        val hovered = index == state.hovered
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .onGloballyPositioned { state.itemBounds[index] = it.boundsInWindow() }
-                                .padding(horizontal = 6.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (hovered) colors.text.copy(alpha = 0.1f) else Color.Transparent)
-                                .semantics { role = Role.Button }
-                                .clickable {
-                                    if (!entry.keepOpen) state.request?.onDismiss?.invoke()
-                                    entry.onClick()
+            SettlingGlass(backdrop, PANEL_SHAPE, lens = 10.dp, settled = settled)
+            Column(
+                Modifier
+                    .clip(PANEL_SHAPE)
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 6.dp),
+            ) {
+                val checkable = menu.entries.any { it is MenuEntry.Item && it.checked }
+                menu.entries.forEachIndexed { index, entry ->
+                    when (entry) {
+                        MenuEntry.Separator -> Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(0.5.dp).background(colors.divider))
+                        is MenuEntry.Label -> BasicText(
+                            entry.text,
+                            style = TextStyle(color = colors.secondaryText, fontSize = 13.sp),
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 2.dp),
+                        )
+                        is MenuEntry.Item -> {
+                            val tint = if (entry.danger) colors.danger else colors.text
+                            val hovered = index == state.hovered
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .onGloballyPositioned { state.itemBounds[index] = it.boundsInWindow() }
+                                    .padding(horizontal = 6.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (hovered) colors.text.copy(alpha = 0.1f) else Color.Transparent)
+                                    .semantics { role = Role.Button }
+                                    .clickable {
+                                        if (!entry.keepOpen) state.request?.onDismiss?.invoke()
+                                        entry.onClick()
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (checkable) {
+                                    Box(Modifier.width(24.dp)) {
+                                        if (entry.checked) Icon(R.drawable.ui_check, colors.accent, size = 18.dp)
+                                    }
                                 }
-                                .padding(horizontal = 10.dp, vertical = 11.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (checkable) {
-                                Box(Modifier.width(24.dp)) {
-                                    if (entry.checked) Icon(R.drawable.ui_check, colors.accent, size = 18.dp)
+                                BasicText(entry.label, style = TextStyle(color = tint, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                if (entry.detail != null) {
+                                    Spacer(Modifier.width(8.dp))
+                                    BasicText(entry.detail, style = TextStyle(color = colors.secondaryText, fontSize = 15.sp))
                                 }
-                            }
-                            BasicText(entry.label, style = TextStyle(color = tint, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                            if (entry.detail != null) {
-                                Spacer(Modifier.width(8.dp))
-                                BasicText(entry.detail, style = TextStyle(color = colors.secondaryText, fontSize = 15.sp))
-                            }
-                            if (entry.icon != null) {
-                                Spacer(Modifier.width(12.dp))
-                                Icon(entry.icon, tint, size = 20.dp)
+                                if (entry.icon != null) {
+                                    Spacer(Modifier.width(12.dp))
+                                    Icon(entry.icon, tint, size = 20.dp)
+                                }
                             }
                         }
                     }

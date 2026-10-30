@@ -90,6 +90,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import android.os.Build
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import com.lyricsadapter.app.ui.glass.GlassMenuHost
@@ -332,10 +333,12 @@ fun AppScreen(container: AppContainer) {
     val pageStates = rememberSaveableStateHolder()
     CompositionLocalProvider(LocalGlassMenu provides menu) {
         Box(Modifier.fillMaxSize()) {
-            // The page and its bottom row blur while a menu is open over them.
+            // The page and its bottom row blur while a menu or the page bubbles are open over them.
             Box(
                 Modifier.fillMaxSize().graphicsLayer {
-                    val radius = MENU_BLUR.toPx() * menu.progress.value.coerceIn(0f, 1f)
+                    // Always its own layer, so blurring it does not first draw the whole page, glass and all, again.
+                    compositingStrategy = CompositingStrategy.Offscreen
+                    val radius = MENU_BLUR.toPx() * maxOf(menu.progress.value, switcher.progress.value).coerceIn(0f, 1f)
                     renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Clamp) else null
                 },
             ) {

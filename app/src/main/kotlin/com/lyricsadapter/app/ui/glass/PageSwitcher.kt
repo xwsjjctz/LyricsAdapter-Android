@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -62,6 +63,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.fillMaxHeight
 
 /** One page the switcher offers: its icon and name. */
 class PageOption(val icon: Int, val label: String)
@@ -77,6 +79,9 @@ class PageSwitcher {
     var hovered by mutableIntStateOf(-1)
     internal var button by mutableStateOf<Rect?>(null)
     internal val bubbles = mutableStateMapOf<Int, Rect>()
+
+    /** From closed (0) to open (1); the page blurs along with it, as under a menu, so the bubbles read as glass. */
+    val progress = Animatable(0f)
 
     internal fun bubbleAt(position: Offset): Int = bubbles.entries.firstOrNull { it.value.contains(position) }?.key ?: -1
 }
@@ -172,6 +177,7 @@ internal fun BoxScope.PageBubbles(
     val density = LocalDensity.current
     val progress = remember(pages.size) { List(pages.size) { Animatable(0f) } }
     LaunchedEffect(switcher.open) {
+        launch { switcher.progress.animateTo(if (switcher.open) 1f else 0f, spring(stiffness = 420f)) }
         progress.forEachIndexed { index, animation ->
             launch {
                 delay(BUBBLE_STAGGER_MS * if (switcher.open) index else pages.lastIndex - index)
@@ -179,7 +185,10 @@ internal fun BoxScope.PageBubbles(
             }
         }
     }
-    val shown = switcher.open || progress.any { it.value > 0.01f }
+    // Derived, so the springs redraw the bubbles without recomposing them every frame.
+    val shown by remember(progress) { derivedStateOf { switcher.open || progress.any { it.value > 0.01f } } }
+    // The real glass fades in once the bubbles stand still; see SettlingGlass.
+    val settled by remember(progress) { derivedStateOf { switcher.open && progress.none { it.isRunning } } }
     if (!shown) {
         switcher.bubbles.clear()
         return
@@ -204,7 +213,7 @@ internal fun BoxScope.PageBubbles(
             val page = pages[index]
             val active = index == selected
             val hovered = index == switcher.hovered
-            Row(
+            Box(
                 Modifier
                     .graphicsLayer {
                         val p = progress[index].value
@@ -216,24 +225,29 @@ internal fun BoxScope.PageBubbles(
                         transformOrigin = TransformOrigin(0f, 1f)
                     }
                     .onGloballyPositioned { switcher.bubbles[index] = it.boundsInWindow() }
-                    .height(BUBBLE_HEIGHT)
-                    .glass(backdrop, Capsule(), lens = 10.dp)
-                    .clip(Capsule())
-                    .semantics {
-                        role = Role.Tab
-                        this.selected = active
-                    }
-                    .clickable {
-                        switcher.open = false
-                        onSelect(index)
-                    }
-                    .padding(start = 16.dp, end = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(BUBBLE_HEIGHT),
             ) {
-                val tint = if (active || hovered) colors.accent else colors.text
-                Icon(page.icon, tint, size = 24.dp)
-                Spacer(Modifier.width(10.dp))
-                BasicText(page.label, style = TextStyle(color = tint, fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
+                SettlingGlass(backdrop, Capsule(), lens = 10.dp, settled = settled)
+                Row(
+                    Modifier
+                        .fillMaxHeight()
+                        .clip(Capsule())
+                        .semantics {
+                            role = Role.Tab
+                            this.selected = active
+                        }
+                        .clickable {
+                            switcher.open = false
+                            onSelect(index)
+                        }
+                        .padding(start = 16.dp, end = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val tint = if (active || hovered) colors.accent else colors.text
+                    Icon(page.icon, tint, size = 24.dp)
+                    Spacer(Modifier.width(10.dp))
+                    BasicText(page.label, style = TextStyle(color = tint, fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
+                }
             }
         }
     }
