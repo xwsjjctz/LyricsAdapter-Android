@@ -35,6 +35,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -193,8 +194,7 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
     Box(
         Modifier
             .matchParentSize()
-            .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
-            .background(MenuVeil)
+            .drawBehind { drawRect(MenuVeil, alpha = progress.value.coerceIn(0f, 1f)) }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.request?.onDismiss?.invoke() },
     )
     menu.preview?.let { preview ->
