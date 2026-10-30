@@ -170,7 +170,9 @@ fun LibraryScreen(
         val landscape = maxWidth > maxHeight
         val column = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().align(Alignment.TopCenter)
         val listPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp)
-        Box(column.fillMaxHeight().layerBackdrop(listBackdrop)) {
+        // The poster wall keeps the whole width, its columns sized for the screen; the list and results keep to the column.
+        val wall = layout == LibraryLayout.Wall && !searching && tracks.isNotEmpty()
+        Box((if (wall) Modifier.fillMaxSize() else column.fillMaxHeight()).layerBackdrop(listBackdrop)) {
             if (searching) {
                 SearchResults(search, query, listPadding, onPicked = endSearch)
             } else if (tracks.isEmpty()) {
@@ -218,15 +220,18 @@ fun LibraryScreen(
             }
         }
         // The header stays put; the list scrolls under it and, past the title, under the glass search field.
-        Column(column.onSizeChanged { headerHeight = with(density) { it.height.toDp() } }) {
-            Column(Modifier.fillMaxWidth().background(colors.background).padding(top = contentPadding.calculateTopPadding())) {
-                if (selection != null) {
-                    SelectionHeader(tracks, selection, onSelectionChange)
-                } else {
-                    LibraryHeader(
-                        slot, tracks, slotCounts, actions, menus, status, compact = landscape,
-                        onScrollToTop = { scope.launch { listState.animateScrollToItem(0) } },
-                    )
+        // Its background spans the whole width, so the wide poster wall does not show beside it.
+        Column(Modifier.fillMaxWidth().onSizeChanged { headerHeight = with(density) { it.height.toDp() } }, horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.fillMaxWidth().background(colors.background).padding(top = contentPadding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
+                Column(Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth()) {
+                    if (selection != null) {
+                        SelectionHeader(tracks, selection, onSelectionChange)
+                    } else {
+                        LibraryHeader(
+                            slot, tracks, slotCounts, actions, menus, status, compact = landscape,
+                            onScrollToTop = { scope.launch { listState.animateScrollToItem(0) } },
+                        )
+                    }
                 }
             }
             if (selection == null) {
@@ -243,7 +248,7 @@ fun LibraryScreen(
                         }
                     },
                     backdrop = listBackdrop,
-                    modifier = Modifier.padding(start = 16.dp, end = 8.dp, bottom = 8.dp),
+                    modifier = Modifier.widthIn(max = MAX_CONTENT_WIDTH).padding(start = 16.dp, end = 8.dp, bottom = 8.dp),
                 )
             }
         }

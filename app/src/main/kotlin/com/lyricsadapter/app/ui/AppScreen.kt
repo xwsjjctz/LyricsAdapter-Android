@@ -240,12 +240,15 @@ fun AppScreen(container: AppContainer) {
         val saved = settings.lastPlayback.value.value
         val playlistRef = settings.openedPlaylist.value.value
         if (playlistRef != null && container.online.playlist.value == null && (slot == SlotId.Playlist || saved?.slot == SlotId.Playlist)) {
-            val playlist = loadPlaylists(container).firstOrNull { playlistKey(it) == playlistRef }
-            if (playlist != null) {
-                try {
-                    container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
-                } catch (_: MusicSourceException) {
-                    // Offline or signed out: the playlist slot stays empty, as before.
+            // A source that never answers gives up like one that fails.
+            withTimeoutOrNull(RESTORE_TIMEOUT_MS) {
+                val playlist = loadPlaylists(container).firstOrNull { playlistKey(it) == playlistRef }
+                if (playlist != null) {
+                    try {
+                        container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
+                    } catch (_: MusicSourceException) {
+                        // Offline or signed out: the playlist slot stays empty, as before.
+                    }
                 }
             }
         }
@@ -253,7 +256,8 @@ fun AppScreen(container: AppContainer) {
             val list = withTimeoutOrNull(RESTORE_TIMEOUT_MS) {
                 snapshotFlow { latestTracksOf(saved.slot) }.first { tracks -> tracks.any { it.id == saved.trackId } }
             }
-            if (list != null) {
+            // A song picked while the list was still loading wins over the saved one.
+            if (list != null && player.state.value.currentId == null) {
                 val index = list.indexOfFirst { it.id == saved.trackId }
                 queueSlot = saved.slot
                 player.load(list, index, saved.positionMs)
