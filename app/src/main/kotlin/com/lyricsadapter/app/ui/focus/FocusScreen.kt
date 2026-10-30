@@ -62,6 +62,15 @@ import com.lyricsadapter.app.ui.Cover
 import com.lyricsadapter.library.Track
 import kotlinx.coroutines.launch
 import com.lyricsadapter.app.ui.blocksTouches
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.runtime.mutableStateOf
 
 /** How far the header must be pulled down to close focus mode. */
 private val DISMISS_DISTANCE = 120.dp
@@ -70,7 +79,7 @@ private val DISMISS_DISTANCE = 120.dp
 private val CONTROLS_SPACE = FOCUS_CONTROLS_HEIGHT + FOCUS_CONTROLS_BOTTOM
 private const val CONTROLS_FADE_MS = 200
 
-/** Scrolling the lyrics by hand shows the controls until the lyrics follow the song again. */
+/** Dragging the lyrics shows the controls while the finger is down, like a touch on them. */
 private const val SCROLL_HOLD = "scroll"
 
 /** Landscape: the artwork column's share of the width, and its cover's share of the height. */
@@ -145,7 +154,7 @@ fun FocusScreen(
                     anchor = anchor,
                     linePadding = linePadding,
                     translations = translation.lines,
-                    onScrollingChange = { scrolling -> if (scrolling) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
+                    onDraggingChange = { dragging -> if (dragging) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
                 )
                 lyrics.plainText.isNotEmpty() -> BasicText(
                     lyrics.plainText,
@@ -200,24 +209,33 @@ fun FocusScreen(
         if (maxWidth > maxHeight) {
             val gap = (maxWidth * LANDSCAPE_GAP_SHARE).coerceIn(20.dp, 48.dp)
             val cover = (maxWidth * LANDSCAPE_COVER_SHARE).coerceIn(140.dp, 280.dp)
+            // The lyrics column takes the height of the cover and its text, so both columns line up.
+            var artworkHeight by remember { mutableStateOf(Dp.Unspecified) }
             Row(
                 Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = LANDSCAPE_SIDES),
                 horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(LANDSCAPE_ARTWORK_WEIGHT).fillMaxHeight()) {
-                    LandscapeArtwork(track, cover, Modifier.fillMaxSize().graphicsLayer { alpha = 1f - controlsAlpha }.then(dismissDrag))
+                    LandscapeArtwork(
+                        track,
+                        cover,
+                        onContentHeight = { artworkHeight = it },
+                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - controlsAlpha }.then(dismissDrag),
+                    )
                     controlsArea(Modifier.align(Alignment.Center), 0.dp)
-                    // Over the artwork, so it never covers the lyrics.
-                    Grabber(onClose, Modifier.align(Alignment.TopCenter))
                 }
                 lyricsPane(
-                    Modifier.weight(LANDSCAPE_LYRICS_WEIGHT).fillMaxHeight(LANDSCAPE_LYRICS_HEIGHT),
+                    Modifier
+                        .weight(LANDSCAPE_LYRICS_WEIGHT)
+                        .then(if (artworkHeight.isSpecified) Modifier.height(artworkHeight) else Modifier.fillMaxHeight(LANDSCAPE_LYRICS_HEIGHT)),
                     0.dp,
                     LyricsAnchor.Centre,
                     settings.fontSize.dp,
                 )
             }
+            // Over the middle of the page, in the top margin that both columns leave free.
+            Grabber(onClose, Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)))
         } else {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Grabber(onClose, Modifier.align(Alignment.CenterHorizontally))
@@ -266,11 +284,15 @@ private fun PortraitHeader(track: Track, modifier: Modifier = Modifier) {
 
 /** Desktop's landscape artwork column: a large rounded cover with the title, artist and album centred under it. */
 @Composable
-private fun LandscapeArtwork(track: Track, coverSize: Dp, modifier: Modifier = Modifier) {
+private fun LandscapeArtwork(track: Track, coverSize: Dp, onContentHeight: (Dp) -> Unit, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         // Short screens keep room for the three lines of text under the cover.
         val cover = minOf(coverSize, maxWidth, maxHeight - 96.dp).coerceAtLeast(96.dp)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.onSizeChanged { onContentHeight(with(density) { it.height.toDp() }) },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Cover(track.coverPath, size = cover, cornerRadius = 16.dp)
             Spacer(Modifier.height(20.dp))
             BasicText(

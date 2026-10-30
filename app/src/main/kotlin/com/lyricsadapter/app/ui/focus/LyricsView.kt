@@ -106,8 +106,8 @@ private const val BROWSE_HOLD_MS = 3_000L
  * and lights word by word; other lines are dim, a little smaller and blurred
  * by distance. A line change ripples down the list (see [LyricsScroller]).
  * Dragging scrolls freely and clears the blur; the lyrics return to the sung
- * line a few seconds later; [onScrollingChange] reports when that starts and
- * ends. Tapping a line seeks to it.
+ * line a few seconds later; [onDraggingChange] reports when a finger starts
+ * and stops dragging them. Tapping a line seeks to it.
  *
  * Playback time is read only while drawing and in the active-item
  * derivation, so most frames redraw without recomposing.
@@ -126,7 +126,7 @@ fun LyricsView(
     linePadding: Dp = LINE_PADDING,
     /** Translated text by line index, shown under each line. */
     translations: Map<Int, String> = emptyMap(),
-    onScrollingChange: (Boolean) -> Unit = {},
+    onDraggingChange: (Boolean) -> Unit = {},
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
     val style = remember(settings.fontSize) { lineStyle(settings.fontSize) }
@@ -150,8 +150,7 @@ fun LyricsView(
     // Only touched from callbacks, so changing it never recomposes.
     var browseJob by remember { mutableStateOf<Job?>(null) }
 
-    val latestOnScrollingChange by rememberUpdatedState(onScrollingChange)
-    LaunchedEffect(scrolling) { latestOnScrollingChange(scrolling) }
+    val latestOnDraggingChange by rememberUpdatedState(onDraggingChange)
 
     LaunchedEffect(scroller) {
         while (true) withFrameNanos { scroller.step(it, active) }
@@ -186,8 +185,10 @@ fun LyricsView(
                 onDragStarted = {
                     browseJob?.cancel()
                     scrolling = true
+                    latestOnDraggingChange(true)
                 },
                 onDragStopped = { velocity ->
+                    latestOnDraggingChange(false)
                     browseJob = scope.launch {
                         animateDecay(browse, velocity, FloatExponentialDecaySpec()) { value, _ -> browse = value.coerceIn(browseRange()) }
                         delay(BROWSE_HOLD_MS)
