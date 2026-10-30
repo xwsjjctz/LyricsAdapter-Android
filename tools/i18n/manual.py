@@ -26,11 +26,11 @@ STRINGS = {
         "Les titres en ligne lus ou ajoutés depuis la recherche apparaissent ici",
     ],
     "empty_playlist": [
-        "Sign in to a music source to open its playlists from search",
-        "音楽ソースにログインすると、検索からプレイリストを開けます",
-        "음악 소스에 로그인하면 검색에서 플레이리스트를 열 수 있습니다",
-        "Melde dich bei einer Musikquelle an, um ihre Playlists über die Suche zu öffnen",
-        "Connectez-vous à une source musicale pour ouvrir ses playlists depuis la recherche",
+        "Sign in to a music source, then open its playlists from the menu under the title",
+        "音楽ソースにログインしたら、タイトルのメニューからプレイリストを開けます",
+        "음악 소스에 로그인한 뒤 제목의 메뉴에서 플레이리스트를 열 수 있습니다",
+        "Melde dich bei einer Musikquelle an und öffne ihre Playlists über das Menü am Titel",
+        "Connectez-vous à une source musicale, puis ouvrez ses playlists depuis le menu du titre",
     ],
     "empty_no_sources": [
         "Install a music source plugin to search and play online music",
@@ -58,6 +58,8 @@ STRINGS = {
     "retry": ["Retry", "再試行", "다시 시도", "Erneut versuchen", "Réessayer"],
     "select_none": ["Select None", "選択解除", "선택 해제", "Keine auswählen", "Tout désélectionner"],
     "search": ["Search", "検索", "검색", "Suchen", "Rechercher"],
+    "tab_library": ["Library", "ライブラリ", "보관함", "Mediathek", "Bibliothèque"],
+    "more_actions": ["More", "その他", "더 보기", "Mehr", "Plus"],
     "remove": ["Remove", "削除", "제거", "Entfernen", "Retirer"],
     "edit_no_write_access": [
         "No permission to write this file. Import the song again, then edit it.",

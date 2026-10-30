@@ -12,7 +12,7 @@
     <string name="empty_local">휴대폰의 MP3, FLAC 파일을 가져오세요</string>
     <string name="empty_cloud">WebDAV에 연결하면 클라우드 보관함이 여기에 표시됩니다</string>
     <string name="empty_online">검색에서 재생하거나 추가한 온라인 곡이 여기에 표시됩니다</string>
-    <string name="empty_playlist">음악 소스에 로그인하면 검색에서 플레이리스트를 열 수 있습니다</string>
+    <string name="empty_playlist">음악 소스에 로그인한 뒤 제목의 메뉴에서 플레이리스트를 열 수 있습니다</string>
     <string name="open_settings">설정 열기</string>
     <string name="empty_no_sources">음악 소스 플러그인을 설치하면 온라인 음악을 검색하고 재생할 수 있습니다</string>
     <string name="open_plugins">플러그인 관리</string>
@@ -44,6 +44,8 @@
     </plurals>
     <string name="unknown_artist">알 수 없는 아티스트</string>
     <string name="search">검색</string>
+    <string name="tab_library">보관함</string>
+    <string name="more_actions">더 보기</string>
     <string name="cancel">취소</string>
     <string name="done">완료</string>
     <string name="save">저장</string>

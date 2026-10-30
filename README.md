@@ -2,8 +2,9 @@
 
 [LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端。技术验证（QuickJS 跑插件、lofty 读写标签、Compose 逐字歌词）已完成，应用已覆盖桌面版的主要页面：
 
-- 曲库：本地、云端、在线播放记录、歌单四个槽位；海报墙（窄屏用桌面的 6 列模板，宽于 720dp 用桌面的分带排列）与 Apple Music 风格列表可切换；长按菜单、多选移除
-- 命令面板（手机上的 ⌘K）：本地、云端、各音乐源与歌单的统一搜索（支持拼音），全部功能命令，子命令（打开歌单、管理歌单显示）
+- 界面结构仿 iOS 26 Apple Music：底部浮动的液态玻璃标签栏（资料库、搜索、设置，可拖动切换），上方是玻璃胶囊迷你播放条（点开专注模式，左右滑动切歌）；页面向下滚动时标签栏收成当前标签的圆形按钮、迷你播放条并到同一行，向上滚动或点圆形按钮展开；玻璃效果用 [Backdrop](https://github.com/Kyant0/AndroidLiquidGlass)（Apache-2.0）
+- 曲库：本地、云端、在线播放记录三个槽位，标题下拉里还列出各音乐源账号的歌单（可管理显示哪些）；海报墙（窄屏用桌面的 6 列模板，宽于 720dp 用桌面的分带排列）与 Apple Music 风格列表可切换；「更多」菜单里有播放全部、随机播放、定位当前、导入、刷新云端、多选与切换布局；长按菜单、多选移除
+- 搜索：本地、云端、各音乐源与歌单的统一搜索（支持拼音）
 - 在线歌曲下载：128kbps / 320kbps / FLAC，按实际音质命名，写入标签、歌词、逐字歌词和封面，存到 Music/LyricsAdapter 并加入本地曲库；封面上显示进度
 - 元数据编辑：封面、标题、艺术家、专辑、歌词（含逐字歌词原文），写回文件
 - 专注模式：桌面同款背景、竖屏与横屏布局、控制区；逐字歌词、错落滚动、间奏、长音光晕，透明度与模糊取 AMLL 的值
@@ -22,7 +23,7 @@
 | `audio-tags/` | 标签读写：Rust crate（`rust/`，lofty 0.25，与桌面的 music-tag-native 同一版本线）经 UniFFI 生成 Kotlin 绑定（`src/main/kotlin`，已生成，改 Rust 后运行 `generateBindings`）。`fixtures/` 用桌面同款库生成带标签的样本和桌面读到的期望值 |
 | `lyrics/` | 纯 Kotlin 的 LRC/QRC/YRC 解析与歌词行模型；`fixtures/` 记录桌面 `lrcParser.ts` 对同一批输入的解析结果，测试逐项对照 |
 | `library/` | 纯 Kotlin 的曲库模型：`Track`、海报墙布局（`wall/`，窄屏模板与宽屏分带，测试与桌面 TypeScript 的输出逐格比对）、下载文件命名 |
-| `app/` | 安卓应用：系统文件选择器导入（持久化授权）、标签存入 Room、Media3 后台播放（通知栏、锁屏、耳机拔出暂停）、Apple Music 风格的曲库列表、迷你播放条、专注模式歌词（点歌词跳转） |
+| `app/` | 安卓应用：系统文件选择器导入（持久化授权）、标签存入 Room、Media3 后台播放（通知栏、锁屏、耳机拔出暂停）、Apple Music 风格的曲库列表、液态玻璃底栏与迷你播放条、专注模式歌词（点歌词跳转） |
 | `buildSrc/` | 两个安卓工程共用的 cargo-ndk 构建任务 |
 | `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查；构建时用 cargo-ndk 编出 `libaudio_tags.so`。桌面图标打开的是歌词渲染原型（`src/main/kotlin/.../lyrics/`），演示歌词由 `tools/demo-lyrics.mjs` 交给桌面仓库的 `lrcParser.ts` 解析生成，歌词文字是原创的 |
 
@@ -125,4 +126,4 @@ keyPassword=…
 
 ## 许可
 
-本仓库以 GNU AGPL-3.0-only 发布（见 `LICENSE`）。专注模式的逐词动画移植自 [AMLL](https://github.com/amll-dev/applemusic-like-lyrics)（同为 AGPL-3.0-only）。
+本仓库以 GNU AGPL-3.0-only 发布（见 `LICENSE`）。专注模式的逐词动画移植自 [AMLL](https://github.com/amll-dev/applemusic-like-lyrics)（同为 AGPL-3.0-only）。底栏的玻璃标签栏与其拖动动画改编自 [AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) 的示例代码（Apache-2.0，`app/.../ui/glass/` 各文件头注明出处）。

@@ -13,7 +13,7 @@
     <string name="empty_local">Importiere die MP3- und FLAC-Dateien auf deinem Telefon</string>
     <string name="empty_cloud">Verbinde WebDAV, dann erscheint hier deine Cloud-Mediathek</string>
     <string name="empty_online">Online-Titel, die du über die Suche abspielst oder hinzufügst, erscheinen hier</string>
-    <string name="empty_playlist">Melde dich bei einer Musikquelle an, um ihre Playlists über die Suche zu öffnen</string>
+    <string name="empty_playlist">Melde dich bei einer Musikquelle an und öffne ihre Playlists über das Menü am Titel</string>
     <string name="open_settings">Einstellungen öffnen</string>
     <string name="empty_no_sources">Installiere ein Musikquellen-Plugin, um Online-Musik zu suchen und abzuspielen</string>
     <string name="open_plugins">Plugins verwalten</string>
@@ -49,6 +49,8 @@
     </plurals>
     <string name="unknown_artist">Unbekannter Künstler</string>
     <string name="search">Suchen</string>
+    <string name="tab_library">Mediathek</string>
+    <string name="more_actions">Mehr</string>
     <string name="cancel">Abbrechen</string>
     <string name="done">Fertig</string>
     <string name="save">Speichern</string>

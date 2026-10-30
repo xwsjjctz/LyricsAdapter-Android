@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lyricsadapter.app.R
 import com.lyricsadapter.app.plugins.DownloadQuality
+import com.lyricsadapter.app.plugins.OnlinePlaylist
 import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.library.Track
@@ -81,15 +82,30 @@ class LibraryActions(
     val onSearch: () -> Unit,
 )
 
+/** What the header's menus list besides the slots: the account playlists and the page's other actions. */
+class HeaderMenus(
+    /** Every account playlist, and whether the library hides it. */
+    val playlists: List<Pair<OnlinePlaylist, Boolean>>,
+    /** The playlist open in the playlist slot, if any. */
+    val openedPlaylist: OnlinePlaylist?,
+    val onOpenPlaylist: (OnlinePlaylist) -> Unit,
+    val onTogglePlaylistHidden: (OnlinePlaylist) -> Unit,
+    /** Called as the slot menu opens, to list the playlists afresh. */
+    val onSlotMenuOpen: () -> Unit,
+    /** The page's other actions, behind the "more" button. */
+    val more: List<MenuEntry>,
+)
+
 /** What an empty slot says, and the one action that fills it, if any. */
 class EmptyContent(val message: String, val actionLabel: String?, val onAction: () -> Unit)
 
 /**
  * One library slot as a list in desktop's Apple Music style: a pinned header
- * with the slot's name (tap it to switch slots), its size and the search
- * entry, then cover, title with "artist — album" under it, and duration; the
- * playing row is filled with the accent colour. Long-pressing a row opens
- * its menu; in selection mode taps select instead of playing.
+ * with the slot's name (tap it to switch slots or open an account playlist),
+ * its size, the search entry and a menu of the page's other actions, then
+ * cover, title with "artist — album" under it, and duration; the playing row
+ * is filled with the accent colour. Long-pressing a row opens its menu; in
+ * selection mode taps select instead of playing.
  */
 @Composable
 fun LibraryScreen(
@@ -105,6 +121,7 @@ fun LibraryScreen(
     wallColumns: Int,
     onSelectionChange: (Set<String>?) -> Unit,
     actions: LibraryActions,
+    menus: HeaderMenus,
     empty: EmptyContent,
     status: String? = null,
 ) {
@@ -117,7 +134,7 @@ fun LibraryScreen(
         if (selection != null) {
             SelectionHeader(tracks, selection, onSelectionChange)
         } else {
-            LibraryHeader(slot, tracks, slotCounts, actions, status)
+            LibraryHeader(slot, tracks, slotCounts, actions, menus, status)
         }
         Box(Modifier.weight(1f)) {
             if (tracks.isEmpty()) {
@@ -212,12 +229,15 @@ private val SlotId.hasTrackMenu: Boolean get() = isManaged || this == SlotId.Pla
 private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
 
 @Composable
-private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<SlotId, Int>, actions: LibraryActions, status: String?) {
+private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<SlotId, Int>, actions: LibraryActions, menus: HeaderMenus, status: String?) {
     val colors = LocalAppColors.current
     var switcherAt by remember { mutableStateOf<IntOffset?>(null) }
+    var managerAt by remember { mutableStateOf<IntOffset?>(null) }
+    var moreAt by remember { mutableStateOf<IntOffset?>(null) }
     var titleCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var moreCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -231,9 +251,8 @@ private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<Slo
                         role = Role.Button
                     }
                     .clickable {
-                        val position = titleCoordinates?.positionInWindow() ?: return@clickable
-                        val height = titleCoordinates?.size?.height ?: 0
-                        switcherAt = IntOffset(position.x.roundToInt(), position.y.roundToInt() + height)
+                        switcherAt = titleCoordinates?.below() ?: return@clickable
+                        menus.onSlotMenuOpen()
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -246,21 +265,67 @@ private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<Slo
             )
         }
         IconButton(R.drawable.ui_search, stringResource(R.string.search), tint = colors.accent, onClick = actions.onSearch)
+        if (menus.more.isNotEmpty()) {
+            Box(Modifier.onGloballyPositioned { moreCoordinates = it }) {
+                IconButton(R.drawable.ui_more_horiz, stringResource(R.string.more_actions), tint = colors.accent) {
+                    moreAt = moreCoordinates?.below()
+                }
+            }
+        }
     }
     switcherAt?.let { anchor ->
+        val playlistsTitle = stringResource(R.string.slot_playlist)
+        val manageTitle = stringResource(R.string.command_manage_playlists)
+        val shown = menus.playlists.filterNot { it.second }.map { it.first }
         ContextMenu(
             anchor = anchor,
-            entries = SlotId.entries.map { target ->
-                MenuEntry.Item(
-                    label = stringResource(target.titleRes),
-                    icon = target.iconRes,
-                    detail = (slotCounts[target] ?: 0).toString(),
-                    checked = target == slot,
-                ) { actions.onSwitchSlot(target) }
+            entries = buildList {
+                listOf(SlotId.Local, SlotId.Cloud, SlotId.Online).forEach { target ->
+                    add(
+                        MenuEntry.Item(
+                            label = stringResource(target.titleRes),
+                            icon = target.iconRes,
+                            detail = (slotCounts[target] ?: 0).toString(),
+                            checked = target == slot,
+                        ) { actions.onSwitchSlot(target) },
+                    )
+                }
+                if (menus.playlists.isNotEmpty()) {
+                    add(MenuEntry.Separator)
+                    add(MenuEntry.Label(playlistsTitle))
+                    shown.forEach { playlist ->
+                        val open = slot == SlotId.Playlist && menus.openedPlaylist?.let { it.source == playlist.source && it.id == playlist.id } == true
+                        add(MenuEntry.Item(playlist.name, R.drawable.ui_queue_music, detail = playlist.songCount.toString(), checked = open) { menus.onOpenPlaylist(playlist) })
+                    }
+                    add(MenuEntry.Item(manageTitle, R.drawable.ui_visibility) { managerAt = anchor })
+                }
             },
             onDismiss = { switcherAt = null },
         )
     }
+    managerAt?.let { anchor ->
+        val hidden = stringResource(R.string.palette_state_hidden)
+        val visible = stringResource(R.string.palette_state_shown)
+        ContextMenu(
+            anchor = anchor,
+            entries = menus.playlists.map { (playlist, isHidden) ->
+                MenuEntry.Item(
+                    playlist.name,
+                    if (isHidden) R.drawable.ui_visibility_off else R.drawable.ui_visibility,
+                    detail = if (isHidden) hidden else visible,
+                    keepOpen = true,
+                ) { menus.onTogglePlaylistHidden(playlist) }
+            },
+            onDismiss = { managerAt = null },
+        )
+    }
+    moreAt?.let { anchor -> ContextMenu(anchor = anchor, entries = menus.more, onDismiss = { moreAt = null }) }
+}
+
+/** Just under this element, in window coordinates: where its menu opens. */
+private fun LayoutCoordinates.below(): IntOffset {
+    val position = positionInWindow()
+    return IntOffset(position.x.roundToInt(), position.y.roundToInt() + size.height)
 }
 
 @Composable

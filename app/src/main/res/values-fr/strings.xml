@@ -14,7 +14,7 @@
     <string name="empty_local">Importez les fichiers MP3 et FLAC de votre téléphone</string>
     <string name="empty_cloud">Connectez WebDAV et votre bibliothèque cloud apparaîtra ici</string>
     <string name="empty_online">Les titres en ligne lus ou ajoutés depuis la recherche apparaissent ici</string>
-    <string name="empty_playlist">Connectez-vous à une source musicale pour ouvrir ses playlists depuis la recherche</string>
+    <string name="empty_playlist">Connectez-vous à une source musicale, puis ouvrez ses playlists depuis le menu du titre</string>
     <string name="open_settings">Ouvrir les paramètres</string>
     <string name="empty_no_sources">Installez un plugin de source musicale pour rechercher et lire de la musique en ligne</string>
     <string name="open_plugins">Gérer les plugins</string>
@@ -54,6 +54,8 @@
     </plurals>
     <string name="unknown_artist">Artiste inconnu</string>
     <string name="search">Rechercher</string>
+    <string name="tab_library">Bibliothèque</string>
+    <string name="more_actions">Plus</string>
     <string name="cancel">Annuler</string>
     <string name="done">OK</string>
     <string name="save">Enregistrer</string>

@@ -76,6 +76,11 @@ ICONS = {
     "ui_play_arrow_filled": ("play_arrow", UI_FILLED, "as desktop's player bar uses it"),
     "ui_pause_filled": ("pause", UI_FILLED, "as desktop's player bar uses it"),
     "ui_skip_next_filled": ("skip_next", UI_FILLED, "as desktop's player bar uses it"),
+    # The bottom tab bar and mini player, in the style of iOS Apple Music: filled tab glyphs.
+    "ui_library_music_filled": ("library_music", UI_FILLED, "for the library tab"),
+    "ui_settings_filled": ("settings", UI_FILLED, "for the settings tab"),
+    "ui_fast_forward_filled": ("fast_forward", UI_FILLED, "for the mini player"),
+    "ui_more_horiz": ("more_horiz", UI, None),
     # Desktop's portrait focus controls (`FocusPortraitControls.tsx`, `FocusTranslateButton.tsx`).
     **{
         f"ms_{name}": (name, FOCUS, "as desktop's portrait controls use it")

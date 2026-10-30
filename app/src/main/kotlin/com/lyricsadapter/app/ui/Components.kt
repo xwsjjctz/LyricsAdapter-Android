@@ -198,6 +198,8 @@ sealed interface MenuEntry {
         val danger: Boolean = false,
         val detail: String? = null,
         val checked: Boolean = false,
+        /** Leaves the menu open, for toggles picked one after another. */
+        val keepOpen: Boolean = false,
         val onClick: () -> Unit,
     ) : MenuEntry
 
@@ -248,7 +250,7 @@ fun ContextMenu(anchor: IntOffset, entries: List<MenuEntry>, onDismiss: () -> Un
                                 .fillMaxWidth()
                                 .semantics { role = Role.Button }
                                 .clickable {
-                                    onDismiss()
+                                    if (!entry.keepOpen) onDismiss()
                                     entry.onClick()
                                 }
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
