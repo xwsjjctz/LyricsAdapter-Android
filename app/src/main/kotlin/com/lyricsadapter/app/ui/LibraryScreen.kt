@@ -1,7 +1,6 @@
 package com.lyricsadapter.app.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +52,27 @@ import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.library.Track
 import kotlin.math.roundToInt
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.onClick
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.lyricsadapter.app.ui.search.SearchField
+import com.lyricsadapter.app.ui.search.SearchMusic
+import com.lyricsadapter.app.ui.search.SearchResults
+import com.lyricsadapter.app.ui.search.firstResult
+import kotlinx.coroutines.launch
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import com.lyricsadapter.app.ui.glass.MenuPreview
+import com.lyricsadapter.app.ui.glass.menuPress
 
 /** What a slot is called and drawn with, as desktop's sidebar and palette name them. */
 internal val SlotId.titleRes: Int
@@ -79,7 +99,6 @@ class LibraryActions(
     /** Online songs only; null where the list has none. */
     val onDownload: ((Track, DownloadQuality) -> Unit)?,
     val onSwitchSlot: (SlotId) -> Unit,
-    val onSearch: () -> Unit,
 )
 
 /** What the header's menus list besides the slots: the account playlists and the page's other actions. */
@@ -101,11 +120,13 @@ class EmptyContent(val message: String, val actionLabel: String?, val onAction: 
 
 /**
  * One library slot as a list in desktop's Apple Music style: a pinned header
- * with the slot's name (tap it to switch slots or open an account playlist),
- * its size, the search entry and a menu of the page's other actions, then
- * cover, title with "artist — album" under it, and duration; the playing row
- * is filled with the accent colour. Long-pressing a row opens its menu; in
- * selection mode taps select instead of playing.
+ * with the slot's name (tap it to switch slots or open an account playlist;
+ * double-tap the header to go back to the top), its size and a menu of the
+ * page's other actions, a Liquid Glass search field that stays over the list
+ * as it scrolls under it, then cover, title with "artist — album" under it,
+ * and duration; the playing row is filled with the accent colour. While the
+ * search field is in use its results take the list's place. Long-pressing a
+ * row opens its menu; in selection mode taps select instead of playing.
  */
 @Composable
 fun LibraryScreen(
@@ -122,23 +143,38 @@ fun LibraryScreen(
     onSelectionChange: (Set<String>?) -> Unit,
     actions: LibraryActions,
     menus: HeaderMenus,
+    search: SearchMusic,
     empty: EmptyContent,
     status: String? = null,
 ) {
     val colors = LocalAppColors.current
+    val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val density = LocalDensity.current
     var pendingRemoval by remember { mutableStateOf<Set<String>?>(null) }
-    var menu by remember { mutableStateOf<Pair<Track, IntOffset>?>(null) }
+    // The song whose menu is open, where the finger pressed, and the row to lift (none on the wall).
+    var menu by remember { mutableStateOf<Triple<Track, IntOffset, Rect?>?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var searchFocused by remember { mutableStateOf(false) }
+    val searching = selection == null && (searchFocused || query.isNotEmpty())
+    val endSearch = {
+        query = ""
+        focusManager.clearFocus()
+    }
+    BackHandler(enabled = searching, onBack = endSearch)
+    var headerHeight by remember { mutableStateOf(0.dp) }
     val editable = slot == SlotId.Local
+    val listBackdrop = rememberLayerBackdrop()
 
-    Column(Modifier.fillMaxSize().background(colors.background).padding(top = contentPadding.calculateTopPadding())) {
-        if (selection != null) {
-            SelectionHeader(tracks, selection, onSelectionChange)
-        } else {
-            LibraryHeader(slot, tracks, slotCounts, actions, menus, status)
-        }
-        Box(Modifier.weight(1f)) {
-            if (tracks.isEmpty()) {
-                EmptySlot(slot, empty, Modifier.fillMaxSize())
+    BoxWithConstraints(Modifier.fillMaxSize().background(colors.background)) {
+        val landscape = maxWidth > maxHeight
+        val column = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().align(Alignment.TopCenter)
+        val listPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp)
+        Box(column.fillMaxHeight().layerBackdrop(listBackdrop)) {
+            if (searching) {
+                SearchResults(search, query, listPadding, onPicked = endSearch)
+            } else if (tracks.isEmpty()) {
+                EmptySlot(slot, empty, Modifier.fillMaxSize().padding(top = headerHeight))
             } else if (layout == LibraryLayout.Wall) {
                 PosterWall(
                     tracks = tracks,
@@ -147,17 +183,17 @@ fun LibraryScreen(
                     downloads = downloads,
                     columns = wallColumns,
                     listState = listState,
-                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp),
+                    contentPadding = listPadding,
                     onClick = { index ->
                         if (selection != null) onSelectionChange(selection.toggle(tracks[index].id)) else actions.onPlay(index)
                     },
-                    onLongPress = { track, anchor -> if (selection == null && slot.hasTrackMenu) menu = track to anchor },
+                    onLongPress = { track, anchor -> if (selection == null && slot.hasTrackMenu) menu = Triple(track, anchor, null) },
                 )
             } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + if (selection != null) 64.dp else 0.dp),
+                    contentPadding = listPadding,
                 ) {
                     itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
                         TrackRow(
@@ -168,7 +204,7 @@ fun LibraryScreen(
                             onClick = {
                                 if (selection != null) onSelectionChange(selection.toggle(track.id)) else actions.onPlay(index)
                             },
-                            onLongPress = { anchor -> if (selection == null && slot.hasTrackMenu) menu = track to anchor },
+                            onLongPress = { anchor, bounds -> if (selection == null && slot.hasTrackMenu) menu = Triple(track, anchor, bounds) },
                         )
                     }
                 }
@@ -181,11 +217,42 @@ fun LibraryScreen(
                 )
             }
         }
+        // The header stays put; the list scrolls under it and, past the title, under the glass search field.
+        Column(column.onSizeChanged { headerHeight = with(density) { it.height.toDp() } }) {
+            Column(Modifier.fillMaxWidth().background(colors.background).padding(top = contentPadding.calculateTopPadding())) {
+                if (selection != null) {
+                    SelectionHeader(tracks, selection, onSelectionChange)
+                } else {
+                    LibraryHeader(
+                        slot, tracks, slotCounts, actions, menus, status, compact = landscape,
+                        onScrollToTop = { scope.launch { listState.animateScrollToItem(0) } },
+                    )
+                }
+            }
+            if (selection == null) {
+                SearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onFocusChange = { searchFocused = it },
+                    focused = searchFocused,
+                    onCancel = endSearch,
+                    onGo = {
+                        firstResult(search, query)?.let { play ->
+                            play()
+                            endSearch()
+                        }
+                    },
+                    backdrop = listBackdrop,
+                    modifier = Modifier.padding(start = 16.dp, end = 8.dp, bottom = 8.dp),
+                )
+            }
+        }
     }
 
-    menu?.let { (track, anchor) ->
+    menu?.let { (track, anchor, bounds) ->
         ContextMenu(
             anchor = anchor,
+            preview = bounds?.let { MenuPreview(it) { TrackRowBody(track, playing = track.id == currentId, selected = null, download = downloads[track.id]) } },
             entries = buildList {
                 // Desktop's `buildTrackMenuItems`: download first, for online songs outside the local and cloud slots.
                 val download = actions.onDownload
@@ -220,6 +287,9 @@ fun LibraryScreen(
     }
 }
 
+/** The list's widest, so landscape keeps rows a readable length. */
+private val MAX_CONTENT_WIDTH = 720.dp
+
 /** Local and online-queue lists are managed in the app; other slots are play-only (desktop's `buildTrackMenuItems`). */
 private val SlotId.isManaged: Boolean get() = this == SlotId.Local || this == SlotId.Online
 
@@ -229,15 +299,45 @@ private val SlotId.hasTrackMenu: Boolean get() = isManaged || this == SlotId.Pla
 private fun Set<String>.toggle(id: String): Set<String> = if (id in this) this - id else this + id
 
 @Composable
-private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<SlotId, Int>, actions: LibraryActions, menus: HeaderMenus, status: String?) {
+private fun LibraryHeader(
+    slot: SlotId,
+    tracks: List<Track>,
+    slotCounts: Map<SlotId, Int>,
+    actions: LibraryActions,
+    menus: HeaderMenus,
+    status: String?,
+    compact: Boolean,
+    onScrollToTop: () -> Unit,
+) {
     val colors = LocalAppColors.current
     var switcherAt by remember { mutableStateOf<IntOffset?>(null) }
     var managerAt by remember { mutableStateOf<IntOffset?>(null) }
     var moreAt by remember { mutableStateOf<IntOffset?>(null) }
+    var headerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var titleCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var moreCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val openSwitcher = {
+        titleCoordinates?.below()?.let { anchor ->
+            switcherAt = anchor
+            menus.onSlotMenuOpen()
+        }
+    }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { headerCoordinates = it }
+            // A tap on the title opens the slot menu; a double tap anywhere here goes back to the top.
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { offset ->
+                        val header = headerCoordinates ?: return@detectTapGestures
+                        val title = titleCoordinates ?: return@detectTapGestures
+                        if (header.localBoundingBoxOf(title).contains(offset)) openSwitcher()
+                    },
+                    onDoubleTap = { onScrollToTop() },
+                )
+            }
+            .padding(start = 20.dp, end = 8.dp, top = if (compact) 4.dp else 12.dp, bottom = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -245,26 +345,24 @@ private fun LibraryHeader(slot: SlotId, tracks: List<Track>, slotCounts: Map<Slo
             Row(
                 Modifier
                     .onGloballyPositioned { titleCoordinates = it }
-                    .clip(RoundedCornerShape(8.dp))
                     .semantics {
                         contentDescription = switchLabel
                         role = Role.Button
-                    }
-                    .clickable {
-                        switcherAt = titleCoordinates?.below() ?: return@clickable
-                        menus.onSlotMenuOpen()
+                        onClick {
+                            openSwitcher()
+                            true
+                        }
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BasicText(stringResource(slot.titleRes), style = TextStyle(color = colors.text, fontSize = 32.sp, fontWeight = FontWeight.Bold))
-                Icon(R.drawable.ui_expand_more, colors.secondaryText, Modifier.padding(start = 2.dp, top = 4.dp), size = 28.dp)
+                BasicText(stringResource(slot.titleRes), style = TextStyle(color = colors.text, fontSize = if (compact) 24.sp else 32.sp, fontWeight = FontWeight.Bold))
+                Icon(R.drawable.ui_expand_more, colors.secondaryText, Modifier.padding(start = 2.dp, top = 4.dp), size = if (compact) 22.dp else 28.dp)
             }
             BasicText(
                 status ?: pluralStringResource(R.plurals.library_summary, tracks.size, tracks.size, formatTotalDuration(tracks.sumOf { it.durationMs })),
                 style = TextStyle(color = colors.secondaryText, fontSize = 14.sp),
             )
         }
-        IconButton(R.drawable.ui_search, stringResource(R.string.search), tint = colors.accent, onClick = actions.onSearch)
         if (menus.more.isNotEmpty()) {
             Box(Modifier.onGloballyPositioned { moreCoordinates = it }) {
                 IconButton(R.drawable.ui_more_horiz, stringResource(R.string.more_actions), tint = colors.accent) {
@@ -360,38 +458,54 @@ private fun SelectionBar(count: Int, onRemove: () -> Unit, modifier: Modifier = 
     }
 }
 
+/**
+ * One song in the list. A tap plays it (or selects it); a long press opens
+ * its menu with the row lifted over the page, and the finger can slide onto
+ * an item and let go to pick it.
+ */
 @Composable
-private fun TrackRow(track: Track, playing: Boolean, selected: Boolean?, download: Float?, onClick: () -> Unit, onLongPress: (IntOffset) -> Unit) {
-    val colors = LocalAppColors.current
-    val filled = playing && selected == null
-    val textColor = if (filled) colors.onAccent else colors.text
-    val secondaryColor = if (filled) colors.onAccent.copy(alpha = 0.8f) else colors.secondaryText
+private fun TrackRow(
+    track: Track,
+    playing: Boolean,
+    selected: Boolean?,
+    download: Float?,
+    onClick: () -> Unit,
+    onLongPress: (anchor: IntOffset, bounds: Rect) -> Unit,
+) {
     var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val openMenu = stringResource(R.string.song_actions)
-    Row(
+    TrackRowBody(
+        track = track,
+        playing = playing,
+        selected = selected,
+        download = download,
         modifier = Modifier
-            .fillMaxWidth()
             .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (filled) colors.accent else colors.background)
             .onGloballyPositioned { coordinates = it }
             .semantics {
                 role = Role.Button
                 if (selected != null) this.selected = selected
                 onLongClick(openMenu) {
-                    coordinates?.let { onLongPress(it.positionInWindow().let { p -> IntOffset(p.x.roundToInt() + 48, p.y.roundToInt()) }) }
+                    coordinates?.let { onLongPress(it.positionInWindow().let { p -> IntOffset(p.x.roundToInt() + 48, p.y.roundToInt()) }, it.boundsInWindow()) }
                     true
                 }
             }
-            .pointerInput(onClick, onLongPress) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { offset ->
-                        val origin = coordinates?.positionInWindow() ?: return@detectTapGestures
-                        onLongPress(IntOffset((origin.x + offset.x).roundToInt(), (origin.y + offset.y).roundToInt()))
-                    },
-                )
-            }
+            .menuPress(onClick, onLongPress),
+    )
+}
+
+/** How a song row looks: cover, title over "artist — album", and duration or download progress; filled while it plays. */
+@Composable
+private fun TrackRowBody(track: Track, playing: Boolean, selected: Boolean?, download: Float?, modifier: Modifier = Modifier) {
+    val colors = LocalAppColors.current
+    val filled = playing && selected == null
+    val textColor = if (filled) colors.onAccent else colors.text
+    val secondaryColor = if (filled) colors.onAccent.copy(alpha = 0.8f) else colors.secondaryText
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (filled) colors.accent else colors.background)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

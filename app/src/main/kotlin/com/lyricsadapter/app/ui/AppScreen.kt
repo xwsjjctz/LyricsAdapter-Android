@@ -6,19 +6,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,14 +19,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,32 +36,24 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lyricsadapter.app.AppContainer
@@ -75,6 +61,7 @@ import com.lyricsadapter.app.R
 import com.lyricsadapter.app.data.CloudStatus
 import com.lyricsadapter.app.data.EditResult
 import com.lyricsadapter.app.data.FocusSettings
+import com.lyricsadapter.app.data.LastPlayback
 import com.lyricsadapter.app.data.LibraryLayout
 import com.lyricsadapter.app.data.SlotId
 import com.lyricsadapter.app.plugins.DownloadOutcome
@@ -84,28 +71,47 @@ import com.lyricsadapter.app.plugins.OnlinePlaylist
 import com.lyricsadapter.app.ui.editor.MetadataEditor
 import com.lyricsadapter.app.ui.focus.FocusScreen
 import com.lyricsadapter.app.ui.focus.rememberFocusTranslation
-import com.lyricsadapter.app.ui.glass.GlassRoundButton
-import com.lyricsadapter.app.ui.glass.GlassTab
-import com.lyricsadapter.app.ui.glass.GlassTabBar
+import com.lyricsadapter.app.ui.glass.PageBubbles
+import com.lyricsadapter.app.ui.glass.PageButton
+import com.lyricsadapter.app.ui.glass.PageOption
+import com.lyricsadapter.app.ui.glass.PageSwitcher
 import com.lyricsadapter.app.ui.search.OnlineResults
 import com.lyricsadapter.app.ui.search.SearchMusic
-import com.lyricsadapter.app.ui.search.SearchScreen
 import com.lyricsadapter.app.ui.settings.SettingsPage
 import com.lyricsadapter.app.ui.settings.SettingsScreen
+import com.lyricsadapter.library.Track
 import com.lyricsadapter.library.wall.WallLayout
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import android.os.Build
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.graphicsLayer
+import com.lyricsadapter.app.ui.glass.GlassMenuHost
+import com.lyricsadapter.app.ui.glass.GlassMenuState
+import com.lyricsadapter.app.ui.glass.LocalGlassMenu
 
-/** The app's three tabs, as Apple Music's bottom bar holds them. */
-private enum class MainTab { Library, Search, Settings }
+/** The app's two pages, switched by the round button at the bottom. */
+private enum class MainPage { Library, Settings }
+
+/** The bottom row's widest, so landscape keeps it together. */
+private val BOTTOM_ROW_MAX_WIDTH = 520.dp
+
+/** How long a fresh start waits for the saved track's list to load before giving up on restoring it. */
+private const val RESTORE_TIMEOUT_MS = 15_000L
 
 /**
- * The app's one screen: the library, search and settings tabs under Apple
- * Music's floating Liquid Glass bars (the mini player over the tab bar and
- * its search button), and the pages that open over them (metadata editor,
- * focus mode). Back closes the topmost page, then returns to the library.
+ * The app's one screen: the playlist and settings pages, Apple Music's
+ * bottom row over them (a round Liquid Glass page button, whose bubbles
+ * switch pages, beside the always-present mini player), and the pages that
+ * open over them (metadata editor, focus mode). Back closes the topmost
+ * page, then returns to the playlist. What played last is saved as it
+ * changes and loaded again, paused, on a fresh start.
  */
 @Composable
 fun AppScreen(container: AppContainer) {
@@ -129,19 +135,7 @@ fun AppScreen(container: AppContainer) {
     val listState = rememberLazyListState()
     val wallColumns = WallLayout.columnsFor(LocalConfiguration.current.screenWidthDp.toFloat())
 
-    var tab by rememberSaveable { mutableStateOf(MainTab.Library) }
-    // The bars collapse as a page scrolls down and come back as it scrolls up, as iOS 26's do.
-    var barsCollapsed by remember { mutableStateOf(false) }
-    LaunchedEffect(tab) { barsCollapsed = false }
-    val collapseOnScroll = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < -COLLAPSE_SCROLL_PX) barsCollapsed = true
-                if (available.y > COLLAPSE_SCROLL_PX) barsCollapsed = false
-                return Offset.Zero
-            }
-        }
-    }
+    var page by rememberSaveable { mutableStateOf(MainPage.Library) }
     // The settings page to show, and a count that reopens it when asked for again.
     var settingsPage by rememberSaveable { mutableStateOf(SettingsPage.Root) }
     var settingsOpened by rememberSaveable { mutableIntStateOf(0) }
@@ -164,12 +158,15 @@ fun AppScreen(container: AppContainer) {
     val cloudList = remember(cloudTracks) { cloudTracks.map { it.toTrack() } }
     val onlineList = remember(onlineEntries) { onlineEntries.map { it.toTrack() } }
     val playlistList = remember(openedPlaylist) { openedPlaylist?.songs.orEmpty().map { it.toTrack() } }
-    val slotTracks = when (slot) {
-        SlotId.Local -> localTracks
-        SlotId.Cloud -> cloudList
-        SlotId.Online -> onlineList
-        SlotId.Playlist -> playlistList
+    val tracksOf = { target: SlotId ->
+        when (target) {
+            SlotId.Local -> localTracks
+            SlotId.Cloud -> cloudList
+            SlotId.Online -> onlineList
+            SlotId.Playlist -> playlistList
+        }
     }
+    val slotTracks = tracksOf(slot)
     val slotCounts = mapOf(SlotId.Local to localTracks.size, SlotId.Cloud to cloudList.size, SlotId.Online to onlineList.size, SlotId.Playlist to playlistList.size)
     val current = sequenceOf(localTracks, cloudList, onlineList, playlistList).firstNotNullOfOrNull { list -> list.firstOrNull { it.id == playerState.currentId } }
     LaunchedEffect(playerState.error) {
@@ -191,10 +188,10 @@ fun AppScreen(container: AppContainer) {
         selection = null
         settings.activeSlot.set(target)
     }
-    val openSettings = { page: SettingsPage ->
-        settingsPage = page
+    val openSettings = { target: SettingsPage ->
+        settingsPage = target
         settingsOpened++
-        tab = MainTab.Settings
+        page = MainPage.Settings
     }
     // The account playlists, loaded when the sources or their logins change and again when they are about to be listed.
     var playlists by remember { mutableStateOf<List<OnlinePlaylist>>(emptyList()) }
@@ -205,23 +202,75 @@ fun AppScreen(container: AppContainer) {
         scope.launch {
             try {
                 container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
+                settings.openedPlaylist.set(playlistKey(playlist))
                 switchSlot(SlotId.Playlist)
-                tab = MainTab.Library
+                page = MainPage.Library
             } catch (error: MusicSourceException) {
                 Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show()
             }
         }
         Unit
     }
-    val locateCurrent = {
-        switchSlot(SlotId.Local)
-        val index = localTracks.indexOf(current)
-        val item = if (layout == LibraryLayout.Wall) wallBlockOf(index, localTracks.size, wallColumns) else index
+
+    // The list the player's queue came from, so what plays is saved against the right slot.
+    var queueSlot by rememberSaveable { mutableStateOf(settings.lastPlayback.value.value?.slot ?: slot) }
+    val playFrom = { target: SlotId, list: List<Track>, index: Int ->
+        queueSlot = target
+        player.play(list, index)
+    }
+    val scrollTo = { index: Int, size: Int ->
+        val item = if (layout == LibraryLayout.Wall) wallBlockOf(index, size, wallColumns) else index
         if (index >= 0) scope.launch { listState.animateScrollToItem(item) }
     }
+    val locateCurrent = {
+        val target = current?.let { track -> SlotId.entries.firstOrNull { s -> tracksOf(s).any { it.id == track.id } } }
+        if (target != null) {
+            switchSlot(target)
+            val list = tracksOf(target)
+            scrollTo(list.indexOfFirst { it.id == current.id }, list.size)
+        }
+    }
 
-    // Registered before the tabs' own, so a settings page goes back within settings first.
-    BackHandler(enabled = tab != MainTab.Library) { tab = MainTab.Library }
+    // A fresh start picks up where playback stood, paused; a playback service still holding a queue is left alone.
+    var restored by rememberSaveable { mutableStateOf(false) }
+    val latestTracksOf by rememberUpdatedState(tracksOf)
+    LaunchedEffect(Unit) {
+        if (restored) return@LaunchedEffect
+        player.awaitConnected()
+        val saved = settings.lastPlayback.value.value
+        val playlistRef = settings.openedPlaylist.value.value
+        if (playlistRef != null && container.online.playlist.value == null && (slot == SlotId.Playlist || saved?.slot == SlotId.Playlist)) {
+            val playlist = loadPlaylists(container).firstOrNull { playlistKey(it) == playlistRef }
+            if (playlist != null) {
+                try {
+                    container.online.open(playlist, container.sources.playlistSongs(playlist.source, playlist.id))
+                } catch (_: MusicSourceException) {
+                    // Offline or signed out: the playlist slot stays empty, as before.
+                }
+            }
+        }
+        if (saved != null && player.state.value.currentId == null) {
+            val list = withTimeoutOrNull(RESTORE_TIMEOUT_MS) {
+                snapshotFlow { latestTracksOf(saved.slot) }.first { tracks -> tracks.any { it.id == saved.trackId } }
+            }
+            if (list != null) {
+                val index = list.indexOfFirst { it.id == saved.trackId }
+                queueSlot = saved.slot
+                player.load(list, index, saved.positionMs)
+                switchSlot(saved.slot)
+                scrollTo(index, list.size)
+            }
+        }
+        restored = true
+    }
+    val savePlayback = {
+        val id = player.state.value.currentId
+        if (restored && id != null) settings.lastPlayback.set(LastPlayback(queueSlot, id, player.positionMs()))
+    }
+    LaunchedEffect(playerState.currentId, playerState.isPlaying, restored) { savePlayback() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { savePlayback() }
+
+    BackHandler(enabled = page != MainPage.Library) { page = MainPage.Library }
     BackHandler(enabled = selection != null) { selection = null }
     BackHandler(enabled = focusOpen) { focusOpen = false }
     BackHandler(enabled = editingId != null) { editingId = null }
@@ -235,226 +284,184 @@ fun AppScreen(container: AppContainer) {
         wall = layout == LibraryLayout.Wall,
         importFiles = importFiles,
         refreshCloud = container.cloud::refresh,
-        playAll = { player.play(slotTracks, 0) },
-        shuffleAll = { player.playShuffled(slotTracks) },
+        playAll = { playFrom(slot, slotTracks, 0) },
+        shuffleAll = {
+            queueSlot = slot
+            player.playShuffled(slotTracks)
+        },
         selectMultiple = { selection = emptySet() },
         locateCurrent = { locateCurrent() },
         toggleLayout = { settings.libraryLayout.set(if (layout == LibraryLayout.Wall) LibraryLayout.List else LibraryLayout.Wall) },
     )
-
-    val backdrop = rememberLayerBackdrop()
-    val tabs = rememberSaveableStateHolder()
-    Box(Modifier.fillMaxSize()) {
-        val insets = WindowInsets.safeDrawing.asPaddingValues()
-        val direction = LocalLayoutDirection.current
-        val contentPadding = PaddingValues(
-            start = insets.calculateStartPadding(direction),
-            end = insets.calculateEndPadding(direction),
-            top = insets.calculateTopPadding(),
-            bottom = insets.calculateBottomPadding() + bottomBarsSpace(hasMiniPlayer = current != null),
-        )
-        Box(Modifier.fillMaxSize().background(colors.background).layerBackdrop(backdrop).nestedScroll(collapseOnScroll)) {
-            tabs.SaveableStateProvider(tab) {
-                when (tab) {
-                    MainTab.Library -> LibraryScreen(
-                        slot = slot,
-                        layout = layout,
-                        tracks = slotTracks,
-                        slotCounts = slotCounts,
-                        currentId = playerState.currentId,
-                        listState = listState,
-                        contentPadding = contentPadding,
-                        selection = selection,
-                        downloads = downloads,
-                        wallColumns = wallColumns,
-                        onSelectionChange = { selection = it },
-                        actions = LibraryActions(
-                            onPlay = { index -> player.play(slotTracks, index) },
-                            onEdit = { track -> editingId = track.id },
-                            onRemove = { ids -> if (slot == SlotId.Online) container.online.remove(ids) else library.remove(ids) },
-                            onDownload = { track, quality ->
-                                container.online.find(track.id)?.song?.let { song ->
-                                    container.downloads.start(song, quality)
-                                    Toast.makeText(context, context.getString(R.string.download_started, song.title), Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            onSwitchSlot = switchSlot,
-                            onSearch = { tab = MainTab.Search },
-                        ),
-                        menus = HeaderMenus(
-                            playlists = playlists.map { it to (playlistKey(it) in hiddenPlaylists) },
-                            openedPlaylist = openedPlaylist?.playlist,
-                            onOpenPlaylist = openPlaylist,
-                            onTogglePlaylistHidden = { playlist ->
-                                val key = playlistKey(playlist)
-                                settings.hiddenPlaylists.set(if (key in hiddenPlaylists) hiddenPlaylists - key else hiddenPlaylists + key)
-                            },
-                            onSlotMenuOpen = { playlistsWanted++ },
-                            more = more,
-                        ),
-                        empty = emptyContent(
-                            slot = slot,
-                            cloudStatus = cloudStatus,
-                            hasSources = hasSources,
-                            openPlugins = { openSettings(SettingsPage.Plugins) },
-                            importFiles = importFiles,
-                            openCloudSettings = { openSettings(SettingsPage.Cloud) },
-                            refreshCloud = container.cloud::refresh,
-                            search = { tab = MainTab.Search },
-                        ),
-                        status = when {
-                            slot == SlotId.Cloud && cloudStatus == CloudStatus.Loading -> stringResource(R.string.cloud_loading)
-                            slot == SlotId.Playlist && openedPlaylist != null -> openedPlaylist?.playlist?.name
-                            else -> null
-                        },
-                    )
-                    MainTab.Search -> {
-                        LaunchedEffect(Unit) { playlistsWanted++ }
-                        SearchScreen(
-                            music = SearchMusic(
-                                localTracks = localTracks,
-                                cloudTracks = cloudList,
-                                searchOnline = { query -> searchSources(container, query) },
-                                playlists = playlists.filterNot { playlistKey(it) in hiddenPlaylists },
-                                playTrack = { track ->
-                                    val (target, list) = if (cloudList.any { it.id == track.id }) SlotId.Cloud to cloudList else SlotId.Local to localTracks
-                                    switchSlot(target)
-                                    player.play(list, list.indexOf(track).coerceAtLeast(0))
-                                },
-                                playOnline = { song ->
-                                    // Desktop plays a search result from the online list, adding it on top.
-                                    container.online.add(song)
-                                    switchSlot(SlotId.Online)
-                                    player.play(container.online.entries.value.map { it.toTrack() }, 0)
-                                },
-                                addOnline = container.online::add,
-                                download = { song, quality ->
-                                    container.downloads.start(song, quality)
-                                    Toast.makeText(context, context.getString(R.string.download_started, song.title), Toast.LENGTH_SHORT).show()
-                                },
-                                openPlaylist = openPlaylist,
-                            ),
-                            contentPadding = contentPadding,
-                        )
-                    }
-                    MainTab.Settings -> key(settingsOpened) {
-                        SettingsScreen(container, settingsPage, onClose = null, bottomPadding = bottomBarsSpace(hasMiniPlayer = current != null))
-                    }
-                }
-            }
-        }
-        BottomBars(
-            tab = tab,
-            onTab = {
-                tab = it
-                barsCollapsed = false
-            },
-            collapsed = barsCollapsed,
-            onExpand = { barsCollapsed = false },
-            backdrop = backdrop,
-            miniPlayer = current?.let { track ->
-                { height ->
-                    MiniPlayer(
-                        track = track,
-                        isPlaying = playerState.isPlaying,
-                        backdrop = backdrop,
-                        onTogglePlay = player::togglePlay,
-                        onNext = player::next,
-                        onPrevious = player::previous,
-                        onOpen = { focusOpen = true },
-                        height = height,
-                    )
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-        AnimatedVisibility(visible = focusOpen && current != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-            if (current != null) {
-                val focusLines = remember(current.id) { current.parsedLyrics().lines }
-                val translation = rememberFocusTranslation(container, current, focusLines)
-                FocusScreen(current, playerState, player, container.volume, focusSettings, translation, onClose = { focusOpen = false })
-            }
-        }
-        AnimatedVisibility(visible = editing != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-            if (editing != null) MetadataEditor(editing, onSave = { edit, done -> library.edit(editing, edit, done) }, onClose = { editingId = null })
-        }
-    }
-}
-
-/**
- * iOS 26 Apple Music's floating bars over the page: the mini player, when
- * something plays, above a Liquid Glass tab bar of the library, search and
- * settings. Scrolled down ([collapsed]), the tab bar shrinks to a round
- * button for the current tab with the mini player beside it; scrolling back
- * up or tapping the button brings the tabs back.
- */
-@Composable
-private fun BottomBars(
-    tab: MainTab,
-    onTab: (MainTab) -> Unit,
-    collapsed: Boolean,
-    onExpand: () -> Unit,
-    backdrop: Backdrop,
-    miniPlayer: (@Composable (height: Dp) -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalAppColors.current
-    val barTabs = listOf(
-        Triple(MainTab.Library, R.drawable.ui_library_music_filled, stringResource(R.string.tab_library)),
-        Triple(MainTab.Search, R.drawable.ui_search, stringResource(R.string.search)),
-        Triple(MainTab.Settings, R.drawable.ui_settings_filled, stringResource(R.string.settings_title)),
+    val search = SearchMusic(
+        localTracks = localTracks,
+        cloudTracks = cloudList,
+        searchOnline = { query -> searchSources(container, query) },
+        playlists = playlists.filterNot { playlistKey(it) in hiddenPlaylists },
+        playTrack = { track ->
+            val target = if (cloudList.any { it.id == track.id }) SlotId.Cloud else SlotId.Local
+            val list = tracksOf(target)
+            switchSlot(target)
+            playFrom(target, list, list.indexOf(track).coerceAtLeast(0))
+        },
+        playOnline = { song ->
+            // Desktop plays a search result from the online list, adding it on top.
+            container.online.add(song)
+            switchSlot(SlotId.Online)
+            playFrom(SlotId.Online, container.online.entries.value.map { it.toTrack() }, 0)
+        },
+        addOnline = container.online::add,
+        download = { song, quality ->
+            container.downloads.start(song, quality)
+            Toast.makeText(context, context.getString(R.string.download_started, song.title), Toast.LENGTH_SHORT).show()
+        },
+        openPlaylist = openPlaylist,
     )
-    AnimatedContent(
-        targetState = collapsed,
-        transitionSpec = { fadeIn(tween(BAR_FADE_MS)) togetherWith fadeOut(tween(BAR_FADE_MS)) using SizeTransform(clip = false) },
-        contentAlignment = Alignment.BottomCenter,
-        label = "bars",
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = BOTTOM_BAR_MARGIN),
-    ) { isCollapsed ->
-        if (isCollapsed) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val (_, icon, label) = barTabs.first { it.first == tab }
-                GlassRoundButton(backdrop, onClick = onExpand, size = COLLAPSED_HEIGHT, modifier = Modifier.semantics { contentDescription = label }) {
-                    Icon(icon, colors.accent, size = 26.dp)
-                }
-                if (miniPlayer != null) {
-                    Spacer(Modifier.width(BOTTOM_BAR_MARGIN))
-                    Box(Modifier.weight(1f)) { miniPlayer(COLLAPSED_HEIGHT) }
-                }
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(BOTTOM_BAR_MARGIN)) {
-                miniPlayer?.invoke(MINI_PLAYER_HEIGHT)
-                val selected = remember { mutableIntStateOf(tab.ordinal) }
-                selected.intValue = tab.ordinal
-                GlassTabBar(
-                    selectedTabIndex = { selected.intValue },
-                    onTabSelected = { index -> onTab(barTabs[index].first) },
-                    backdrop = backdrop,
-                    tabsCount = barTabs.size,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    barTabs.forEach { (target, icon, label) ->
-                        GlassTab(onClick = { onTab(target) }, modifier = Modifier.semantics { this.selected = tab == target }) {
-                            Icon(icon, colors.text, size = 26.dp)
-                            BasicText(label, style = TextStyle(color = colors.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold))
+
+    val pages = listOf(
+        PageOption(R.drawable.ui_library_music_filled, stringResource(R.string.tab_library)),
+        PageOption(R.drawable.ui_settings_filled, stringResource(R.string.settings_title)),
+    )
+    val switcher = remember { PageSwitcher() }
+    val menu = remember { GlassMenuState() }
+    val backdrop = rememberLayerBackdrop()
+    val pageStates = rememberSaveableStateHolder()
+    CompositionLocalProvider(LocalGlassMenu provides menu) {
+        Box(Modifier.fillMaxSize()) {
+            // The page and its bottom row blur while a menu is open over them.
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    val radius = MENU_BLUR.toPx() * menu.progress.value.coerceIn(0f, 1f)
+                    renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Clamp) else null
+                },
+            ) {
+                val insets = WindowInsets.safeDrawing.asPaddingValues()
+                val direction = LocalLayoutDirection.current
+                val contentPadding = PaddingValues(
+                    start = insets.calculateStartPadding(direction),
+                    end = insets.calculateEndPadding(direction),
+                    top = insets.calculateTopPadding(),
+                    bottom = insets.calculateBottomPadding() + BOTTOM_BARS_SPACE,
+                )
+                Box(Modifier.fillMaxSize().background(colors.background).layerBackdrop(backdrop)) {
+                    pageStates.SaveableStateProvider(page) {
+                        when (page) {
+                            MainPage.Library -> LibraryScreen(
+                                slot = slot,
+                                layout = layout,
+                                tracks = slotTracks,
+                                slotCounts = slotCounts,
+                                currentId = playerState.currentId,
+                                listState = listState,
+                                contentPadding = contentPadding,
+                                selection = selection,
+                                downloads = downloads,
+                                wallColumns = wallColumns,
+                                onSelectionChange = { selection = it },
+                                actions = LibraryActions(
+                                    onPlay = { index -> playFrom(slot, slotTracks, index) },
+                                    onEdit = { track -> editingId = track.id },
+                                    onRemove = { ids -> if (slot == SlotId.Online) container.online.remove(ids) else library.remove(ids) },
+                                    onDownload = { track, quality ->
+                                        container.online.find(track.id)?.song?.let { song ->
+                                            container.downloads.start(song, quality)
+                                            Toast.makeText(context, context.getString(R.string.download_started, song.title), Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onSwitchSlot = switchSlot,
+                                ),
+                                menus = HeaderMenus(
+                                    playlists = playlists.map { it to (playlistKey(it) in hiddenPlaylists) },
+                                    openedPlaylist = openedPlaylist?.playlist,
+                                    onOpenPlaylist = openPlaylist,
+                                    onTogglePlaylistHidden = { playlist ->
+                                        val key = playlistKey(playlist)
+                                        settings.hiddenPlaylists.set(if (key in hiddenPlaylists) hiddenPlaylists - key else hiddenPlaylists + key)
+                                    },
+                                    onSlotMenuOpen = { playlistsWanted++ },
+                                    more = more,
+                                ),
+                                search = search,
+                                empty = emptyContent(
+                                    slot = slot,
+                                    cloudStatus = cloudStatus,
+                                    hasSources = hasSources,
+                                    openPlugins = { openSettings(SettingsPage.Plugins) },
+                                    importFiles = importFiles,
+                                    openCloudSettings = { openSettings(SettingsPage.Cloud) },
+                                    refreshCloud = container.cloud::refresh,
+                                ),
+                                status = when {
+                                    slot == SlotId.Cloud && cloudStatus == CloudStatus.Loading -> stringResource(R.string.cloud_loading)
+                                    slot == SlotId.Playlist && openedPlaylist != null -> openedPlaylist?.playlist?.name
+                                    else -> null
+                                },
+                            )
+                            MainPage.Settings -> key(settingsOpened) {
+                                BoxWithConstraints(Modifier.fillMaxSize()) {
+                                    Box(Modifier.widthIn(max = SETTINGS_MAX_WIDTH).fillMaxWidth().fillMaxHeight().align(Alignment.TopCenter)) {
+                                        SettingsScreen(container, settingsPage, onClose = null, bottomPadding = BOTTOM_BARS_SPACE)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+                // The bottom row: the page button beside the mini player, which is always there.
+                Row(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = BOTTOM_ROW_MAX_WIDTH)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = BOTTOM_BAR_MARGIN),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PageButton(
+                        switcher = switcher,
+                        current = pages[page.ordinal],
+                        onSelect = { page = MainPage.entries[it] },
+                        backdrop = backdrop,
+                    )
+                    Spacer(Modifier.width(BOTTOM_BAR_MARGIN))
+                    MiniPlayer(
+                        track = current,
+                        isPlaying = playerState.isPlaying,
+                        backdrop = backdrop,
+                        onTogglePlay = { if (current == null) playFrom(slot, slotTracks, 0) else player.togglePlay() },
+                        onNext = player::next,
+                        onPrevious = player::previous,
+                        onOpen = { focusOpen = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            PageBubbles(switcher, pages, selected = page.ordinal, onSelect = { page = MainPage.entries[it] }, backdrop = backdrop)
+            GlassMenuHost(menu, backdrop)
+            // Focus mode keeps the last track through a moment without one, so a track change never
+            // rebuilds the page and resets it (its controls would vanish at once).
+            val lastTrack = remember { arrayOfNulls<Track>(1) }
+            if (current != null) lastTrack[0] = current
+            val focusTrack = current ?: lastTrack[0]
+            AnimatedVisibility(visible = focusOpen && focusTrack != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                if (focusTrack != null) {
+                    val focusLines = remember(focusTrack.id) { focusTrack.parsedLyrics().lines }
+                    val translation = rememberFocusTranslation(container, focusTrack, focusLines)
+                    FocusScreen(focusTrack, playerState, player, container.volume, focusSettings, translation, onClose = { focusOpen = false })
+                }
+            }
+            AnimatedVisibility(visible = editing != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                if (editing != null) MetadataEditor(editing, onSave = { edit, done -> library.edit(editing, edit, done) }, onClose = { editingId = null })
             }
         }
     }
 }
 
-/** The height of the collapsed bar: the tab button and the mini player beside it. */
-private val COLLAPSED_HEIGHT = 56.dp
-private const val BAR_FADE_MS = 200
+/** How much the page blurs under an open menu. */
+private val MENU_BLUR = 10.dp
 
-/** A scroll this far in one step collapses or expands the bars. */
-private const val COLLAPSE_SCROLL_PX = 6f
+/** Settings stay a readable width on wide screens. */
+private val SETTINGS_MAX_WIDTH = 600.dp
 
 /** The library's "more" menu: what used to be commands in the search palette, for the slot on show. */
 @Composable
@@ -502,7 +509,6 @@ private fun emptyContent(
     importFiles: () -> Unit,
     openCloudSettings: () -> Unit,
     refreshCloud: () -> Unit,
-    search: () -> Unit,
 ): EmptyContent = when (slot) {
     SlotId.Local -> EmptyContent(stringResource(R.string.empty_local), stringResource(R.string.import_files), importFiles)
     SlotId.Cloud -> when (cloudStatus) {
@@ -513,8 +519,9 @@ private fun emptyContent(
     }
     SlotId.Online, SlotId.Playlist -> when {
         !hasSources -> EmptyContent(stringResource(R.string.empty_no_sources), stringResource(R.string.open_plugins), openPlugins)
-        slot == SlotId.Online -> EmptyContent(stringResource(R.string.empty_online), stringResource(R.string.search), search)
-        else -> EmptyContent(stringResource(R.string.empty_playlist), stringResource(R.string.search), search)
+        // The search field over the list fills these.
+        slot == SlotId.Online -> EmptyContent(stringResource(R.string.empty_online), null, {})
+        else -> EmptyContent(stringResource(R.string.empty_playlist), null, {})
     }
 }
 

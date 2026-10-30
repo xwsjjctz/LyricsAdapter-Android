@@ -42,6 +42,23 @@ class RangeSetting internal constructor(prefs: SharedPreferences, key: String, v
     fun set(value: Int) = setting.set(value.coerceIn(range))
 }
 
+/**
+ * Where playback stood, so a fresh start can pick it up again paused, as
+ * desktop restores each slot's `currentTrackIndex` and `currentTime`.
+ */
+data class LastPlayback(val slot: SlotId, val trackId: String, val positionMs: Long) {
+    fun encode(): String = "${slot.name}\n$trackId\n$positionMs"
+
+    companion object {
+        fun decode(text: String?): LastPlayback? {
+            val parts = text?.split('\n') ?: return null
+            if (parts.size != 3) return null
+            val slot = SlotId.entries.firstOrNull { it.name == parts[0] } ?: return null
+            return LastPlayback(slot, parts[1], parts[2].toLongOrNull() ?: 0L)
+        }
+    }
+}
+
 /** Focus mode's look, with desktop's names, ranges and defaults (`settingsManager.ts`). */
 data class FocusSettings(
     val backgroundBlur: Int = 80,
@@ -65,6 +82,13 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
         "hiddenPlaylists",
         prefs.getString("hiddenPlaylists", null)?.split('\n')?.filterTo(mutableSetOf(), String::isNotEmpty).orEmpty(),
     ) { it.joinToString("\n") }
+
+    /** What played last, and where; null until something has played. */
+    val lastPlayback: Setting<LastPlayback?> =
+        Setting(prefs, "lastPlayback", LastPlayback.decode(prefs.getString("lastPlayback", null))) { it?.encode().orEmpty() }
+
+    /** `source:id` of the playlist open in the playlist slot, fetched again on the next start. */
+    val openedPlaylist: Setting<String?> = Setting(prefs, "openedPlaylist", prefs.getString("openedPlaylist", null)?.ifEmpty { null }) { it.orEmpty() }
 
     /** Desktop's `plugin_lyrics_language`: the language lyrics are translated into. */
     val translationLanguage: Setting<String> = Setting(prefs, "plugin_lyrics_language", prefs.getString("plugin_lyrics_language", null) ?: "zh") { it }

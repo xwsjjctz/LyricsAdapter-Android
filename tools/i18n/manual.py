@@ -58,7 +58,8 @@ STRINGS = {
     "retry": ["Retry", "再試行", "다시 시도", "Erneut versuchen", "Réessayer"],
     "select_none": ["Select None", "選択解除", "선택 해제", "Keine auswählen", "Tout désélectionner"],
     "search": ["Search", "検索", "검색", "Suchen", "Rechercher"],
-    "tab_library": ["Library", "ライブラリ", "보관함", "Mediathek", "Bibliothèque"],
+    "tab_library": ["Playlist", "プレイリスト", "재생 목록", "Playlist", "Liste de lecture"],
+    "mini_player_idle": ["Tap a song to start playing", "曲をタップして再生", "곡을 탭하여 재생", "Tippe auf einen Titel, um ihn abzuspielen", "Touchez un titre pour le lire"],
     "more_actions": ["More", "その他", "더 보기", "Mehr", "Plus"],
     "remove": ["Remove", "削除", "제거", "Entfernen", "Retirer"],
     "edit_no_write_access": [

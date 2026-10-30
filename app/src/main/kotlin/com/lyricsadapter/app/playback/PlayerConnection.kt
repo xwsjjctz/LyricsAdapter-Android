@@ -13,6 +13,7 @@ import com.lyricsadapter.library.Track
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
 import kotlin.coroutines.resume
@@ -43,6 +44,12 @@ class PlayerConnection(private val context: Context) {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
     private var controller: MediaController? = null
+    private val connected = MutableStateFlow(false)
+
+    /** Returns once the player service is connected. */
+    suspend fun awaitConnected() {
+        connected.first { it }
+    }
 
     suspend fun connect() {
         if (controller != null) return
@@ -61,6 +68,7 @@ class PlayerConnection(private val context: Context) {
         if (connected.repeatMode == Player.REPEAT_MODE_OFF) connected.repeatMode = Player.REPEAT_MODE_ALL
         controller = connected
         publish(connected)
+        this.connected.value = true
     }
 
     /** Plays [tracks] in order from [index]. */
@@ -69,6 +77,13 @@ class PlayerConnection(private val context: Context) {
         player.setMediaItems(tracks.map(::mediaItem), index, 0)
         player.prepare()
         player.play()
+    }
+
+    /** Puts [tracks] in the player at [index], [positionMs] in, without playing: how a fresh start picks up. */
+    fun load(tracks: List<Track>, index: Int, positionMs: Long) {
+        val player = controller ?: return
+        player.setMediaItems(tracks.map(::mediaItem), index, positionMs)
+        player.prepare()
     }
 
     /** Plays [tracks] in random order, starting from a random one, and leaves shuffle on. */
