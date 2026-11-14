@@ -34,27 +34,29 @@ import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.kyant.shapes.Capsule
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.ui.glass.GLASS_BAR_HEIGHT
 import com.lyricsadapter.app.ui.glass.glass
 import com.lyricsadapter.library.Track
 import kotlin.math.abs
 
-/** The height of the bottom row: the page button and the mini player beside it. */
-val BOTTOM_BAR_HEIGHT = 60.dp
+/** The mini player's height, as iOS 26 Apple Music's over its tab bar. */
+val MINI_PLAYER_HEIGHT = 48.dp
 
-/** The gap between the page button and the mini player, and around the row. */
+/** The gap between the mini player and the tab bar, and around them. */
 val BOTTOM_BAR_MARGIN = 8.dp
 
-/** How much room the bottom row takes at the bottom of a page, over the navigation bar. */
-val BOTTOM_BARS_SPACE = BOTTOM_BAR_HEIGHT + BOTTOM_BAR_MARGIN * 2
+/** How much room the bottom bars take at the bottom of a page, over the navigation bar: stacked, or side by side in landscape. */
+fun bottomBarsSpace(stacked: Boolean) =
+    GLASS_BAR_HEIGHT + BOTTOM_BAR_MARGIN * 2 + if (stacked) MINI_PLAYER_HEIGHT + BOTTOM_BAR_MARGIN else 0.dp
 
-private val COVER_SIZE = 44.dp
+private val COVER_SIZE = 32.dp
 
 /** A horizontal swipe this long changes the track. */
 private val SWIPE_DISTANCE = 56.dp
 
 /**
- * Apple Music's mini player: a Liquid Glass capsule with the artwork, the
- * title over the artist, play or pause and next. Tapping it opens focus
+ * Apple Music's mini player: a Liquid Glass capsule over the tab bar with the
+ * artwork, the title over the artist, play or pause and next. Tapping it opens focus
  * mode; swiping it sideways skips to the next or previous track, as iOS 26.1
  * does. It is always there: with nothing loaded it shows the app's icon and
  * name, play starts the list on show and next is off, as desktop's bar stays
@@ -78,7 +80,7 @@ fun MiniPlayer(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(BOTTOM_BAR_HEIGHT)
+            .height(MINI_PLAYER_HEIGHT)
             .glass(backdrop, Capsule(), lens = 12.dp)
             .clip(Capsule())
             .then(if (loaded) Modifier.clickable(onClick = onOpen) else Modifier)
@@ -95,8 +97,7 @@ fun MiniPlayer(
                     travelled += amount
                 }
             }
-            // The artwork keeps clear of the capsule's round end.
-            .padding(start = 12.dp, end = 4.dp),
+            .padding(start = 8.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (track != null) {
@@ -108,11 +109,11 @@ fun MiniPlayer(
                 modifier = Modifier.size(COVER_SIZE).clip(RoundedCornerShape(10.dp)),
             )
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             BasicText(
                 track?.title ?: stringResource(R.string.app_name),
-                style = TextStyle(color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                style = TextStyle(color = colors.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -127,11 +128,11 @@ fun MiniPlayer(
             icon = if (isPlaying) R.drawable.ui_pause_filled else R.drawable.ui_play_arrow_filled,
             label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
             tint = colors.text,
-            size = 28.dp,
+            size = 26.dp,
             onClick = onTogglePlay,
         )
         if (loaded) {
-            IconButton(R.drawable.ui_fast_forward_filled, stringResource(R.string.action_next), tint = colors.text, size = 28.dp, onClick = onNext)
+            IconButton(R.drawable.ui_fast_forward_filled, stringResource(R.string.action_next), tint = colors.text, size = 26.dp, onClick = onNext)
         } else {
             val label = stringResource(R.string.action_next)
             Box(
@@ -141,7 +142,7 @@ fun MiniPlayer(
                 },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(R.drawable.ui_fast_forward_filled, colors.text.copy(alpha = 0.3f), size = 28.dp)
+                Icon(R.drawable.ui_fast_forward_filled, colors.text.copy(alpha = 0.3f), size = 26.dp)
             }
         }
     }

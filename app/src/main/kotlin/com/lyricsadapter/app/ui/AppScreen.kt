@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -71,10 +73,8 @@ import com.lyricsadapter.app.plugins.OnlinePlaylist
 import com.lyricsadapter.app.ui.editor.MetadataEditor
 import com.lyricsadapter.app.ui.focus.FocusScreen
 import com.lyricsadapter.app.ui.focus.rememberFocusTranslation
-import com.lyricsadapter.app.ui.glass.PageBubbles
-import com.lyricsadapter.app.ui.glass.PageButton
-import com.lyricsadapter.app.ui.glass.PageOption
-import com.lyricsadapter.app.ui.glass.PageSwitcher
+import com.lyricsadapter.app.ui.glass.GlassTab
+import com.lyricsadapter.app.ui.glass.GlassTabBar
 import com.lyricsadapter.app.ui.search.OnlineResults
 import com.lyricsadapter.app.ui.search.SearchMusic
 import com.lyricsadapter.app.ui.settings.SettingsPage
@@ -93,23 +93,33 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.kyant.backdrop.Backdrop
 import com.lyricsadapter.app.ui.glass.GlassMenuHost
 import com.lyricsadapter.app.ui.glass.GlassMenuState
 import com.lyricsadapter.app.ui.glass.LocalGlassMenu
 
-/** The app's two pages, switched by the round button at the bottom. */
+/** The app's two pages, switched by the tab bar at the bottom. */
 private enum class MainPage { Library, Settings }
 
-/** The bottom row's widest, so landscape keeps it together. */
-private val BOTTOM_ROW_MAX_WIDTH = 520.dp
+/** The bottom bars' widest, so landscape keeps them together. */
+private val BOTTOM_BARS_MAX_WIDTH = 520.dp
+
+/** The tab bar's width in landscape, where it sits beside the mini player. */
+private val LANDSCAPE_TAB_BAR_WIDTH = 180.dp
 
 /** How long a fresh start waits for the saved track's list to load before giving up on restoring it. */
 private const val RESTORE_TIMEOUT_MS = 15_000L
 
 /**
  * The app's one screen: the playlist and settings pages, Apple Music's
- * bottom row over them (a round Liquid Glass page button, whose bubbles
- * switch pages, beside the always-present mini player), and the pages that
+ * bottom bars over them (the always-present mini player above a Liquid Glass
+ * tab bar, which is tapped or dragged to switch pages), and the pages that
  * open over them (metadata editor, focus mode). Back closes the topmost
  * page, then returns to the playlist. What played last is saved as it
  * changes and loaded again, paused, on a fresh start.
@@ -323,22 +333,20 @@ fun AppScreen(container: AppContainer) {
         openPlaylist = openPlaylist,
     )
 
-    val pages = listOf(
-        PageOption(R.drawable.ui_library_music_filled, stringResource(R.string.tab_library)),
-        PageOption(R.drawable.ui_settings_filled, stringResource(R.string.settings_title)),
-    )
-    val switcher = remember { PageSwitcher() }
+    // Beside each other on a landscape phone, whose height the stack would use up.
+    val barsStacked = LocalConfiguration.current.let { it.screenWidthDp <= it.screenHeightDp }
+    val barsSpace = bottomBarsSpace(barsStacked)
     val menu = remember { GlassMenuState() }
     val backdrop = rememberLayerBackdrop()
     val pageStates = rememberSaveableStateHolder()
     CompositionLocalProvider(LocalGlassMenu provides menu) {
         Box(Modifier.fillMaxSize()) {
-            // The page and its bottom row blur while a menu or the page bubbles are open over them.
+            // The page and its bottom bars blur while a menu is open over them.
             Box(
                 Modifier.fillMaxSize().graphicsLayer {
                     // Always its own layer, so blurring it does not first draw the whole page, glass and all, again.
                     compositingStrategy = CompositingStrategy.Offscreen
-                    val radius = MENU_BLUR.toPx() * maxOf(menu.progress.value, switcher.progress.value).coerceIn(0f, 1f)
+                    val radius = MENU_BLUR.toPx() * menu.progress.value.coerceIn(0f, 1f)
                     renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Clamp) else null
                 },
             ) {
@@ -348,7 +356,7 @@ fun AppScreen(container: AppContainer) {
                     start = insets.calculateStartPadding(direction),
                     end = insets.calculateEndPadding(direction),
                     top = insets.calculateTopPadding(),
-                    bottom = insets.calculateBottomPadding() + BOTTOM_BARS_SPACE,
+                    bottom = insets.calculateBottomPadding() + barsSpace,
                 )
                 Box(Modifier.fillMaxSize().background(colors.background).layerBackdrop(backdrop)) {
                     pageStates.SaveableStateProvider(page) {
@@ -407,30 +415,20 @@ fun AppScreen(container: AppContainer) {
                             MainPage.Settings -> key(settingsOpened) {
                                 BoxWithConstraints(Modifier.fillMaxSize()) {
                                     Box(Modifier.widthIn(max = SETTINGS_MAX_WIDTH).fillMaxWidth().fillMaxHeight().align(Alignment.TopCenter)) {
-                                        SettingsScreen(container, settingsPage, onClose = null, bottomPadding = BOTTOM_BARS_SPACE)
+                                        SettingsScreen(container, settingsPage, onClose = null, bottomPadding = barsSpace)
                                     }
                                 }
                             }
                         }
                     }
                 }
-                // The bottom row: the page button beside the mini player, which is always there.
-                Row(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .widthIn(max = BOTTOM_ROW_MAX_WIDTH)
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = BOTTOM_BAR_MARGIN),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    PageButton(
-                        switcher = switcher,
-                        current = pages[page.ordinal],
-                        onSelect = { page = MainPage.entries[it] },
-                        backdrop = backdrop,
-                    )
-                    Spacer(Modifier.width(BOTTOM_BAR_MARGIN))
+                BottomBars(
+                    page = { page },
+                    onPage = { page = it },
+                    stacked = barsStacked,
+                    backdrop = backdrop,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) { miniModifier ->
                     MiniPlayer(
                         track = current,
                         isPlaying = playerState.isPlaying,
@@ -439,11 +437,10 @@ fun AppScreen(container: AppContainer) {
                         onNext = player::next,
                         onPrevious = player::previous,
                         onOpen = { focusOpen = true },
-                        modifier = Modifier.weight(1f),
+                        modifier = miniModifier,
                     )
                 }
             }
-            PageBubbles(switcher, pages, selected = page.ordinal, onSelect = { page = MainPage.entries[it] }, backdrop = backdrop)
             GlassMenuHost(menu, backdrop)
             // Focus mode keeps the last track through a moment without one, so a track change never
             // rebuilds the page and resets it (its controls would vanish at once).
@@ -459,6 +456,59 @@ fun AppScreen(container: AppContainer) {
             }
             AnimatedVisibility(visible = editing != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
                 if (editing != null) MetadataEditor(editing, onSave = { edit, done -> library.edit(editing, edit, done) }, onClose = { editingId = null })
+            }
+        }
+    }
+}
+
+/** The mini player above the tab bar of the two pages, or beside it when not [stacked]. */
+@Composable
+private fun BottomBars(
+    page: () -> MainPage,
+    onPage: (MainPage) -> Unit,
+    stacked: Boolean,
+    backdrop: Backdrop,
+    modifier: Modifier = Modifier,
+    miniPlayer: @Composable (Modifier) -> Unit,
+) {
+    val outer = modifier
+        .widthIn(max = BOTTOM_BARS_MAX_WIDTH)
+        .fillMaxWidth()
+        .navigationBarsPadding()
+        .padding(horizontal = 16.dp, vertical = BOTTOM_BAR_MARGIN)
+    val tabBar: @Composable (Modifier) -> Unit = { tabModifier -> PageTabBar(page, onPage, backdrop, tabModifier) }
+    if (stacked) {
+        Column(outer, verticalArrangement = Arrangement.spacedBy(BOTTOM_BAR_MARGIN)) {
+            miniPlayer(Modifier)
+            tabBar(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(outer, horizontalArrangement = Arrangement.spacedBy(BOTTOM_BAR_MARGIN), verticalAlignment = Alignment.CenterVertically) {
+            tabBar(Modifier.width(LANDSCAPE_TAB_BAR_WIDTH))
+            miniPlayer(Modifier.weight(1f))
+        }
+    }
+}
+
+/** The glass tab bar of the app's pages: tap a tab, or drag the lens across to it. */
+@Composable
+private fun PageTabBar(page: () -> MainPage, onPage: (MainPage) -> Unit, backdrop: Backdrop, modifier: Modifier = Modifier) {
+    val colors = LocalAppColors.current
+    val tabs = listOf(
+        Triple(MainPage.Library, R.drawable.ui_library_music_filled, stringResource(R.string.tab_library)),
+        Triple(MainPage.Settings, R.drawable.ui_settings_filled, stringResource(R.string.settings_title)),
+    )
+    GlassTabBar(
+        selectedTabIndex = { page().ordinal },
+        onTabSelected = { index -> onPage(MainPage.entries[index]) },
+        backdrop = backdrop,
+        tabsCount = tabs.size,
+        modifier = modifier,
+    ) {
+        tabs.forEach { (target, icon, label) ->
+            GlassTab(onClick = { onPage(target) }, modifier = Modifier.semantics { selected = page() == target }) {
+                Icon(icon, colors.text, size = 26.dp)
+                BasicText(label, style = TextStyle(color = colors.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold))
             }
         }
     }

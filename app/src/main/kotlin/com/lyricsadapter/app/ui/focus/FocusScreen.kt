@@ -72,7 +72,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.runtime.mutableStateOf
 
-/** How far the header must be pulled down to close focus mode. */
+/** How far the grabber or the header must be pulled down to close focus mode. */
 private val DISMISS_DISTANCE = 120.dp
 
 /** The lyrics run on under the controls; this much at the bottom is theirs while they show. */
@@ -102,7 +102,7 @@ private const val LANDSCAPE_LYRICS_HEIGHT = 0.6f
  * title sit above the lyrics and the controls under them, as desktop's
  * portrait layout; in landscape the cover and title fill the left side and
  * the lyrics the right, and the controls take the cover's place while they
- * show. Pulling the cover down or tapping the grabber closes it.
+ * show. Pulling the grabber or the cover down, or tapping the grabber, closes it.
  */
 @Composable
 fun FocusScreen(
@@ -235,10 +235,11 @@ fun FocusScreen(
                 )
             }
             // Over the middle of the page, in the top margin that both columns leave free.
-            Grabber(onClose, Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)))
+            Grabber(onClose, Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).then(dismissDrag))
         } else {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                Grabber(onClose, Modifier.align(Alignment.CenterHorizontally))
+                // The whole width, so the finger need not find the small bar.
+                Grabber(onClose, Modifier.fillMaxWidth().then(dismissDrag))
                 PortraitHeader(track, dismissDrag)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     lyricsPane(Modifier.fillMaxSize(), CONTROLS_SPACE, LyricsAnchor.Top, LINE_PADDING)
@@ -249,7 +250,7 @@ fun FocusScreen(
     }
 }
 
-/** The bar at the top that closes focus mode when tapped. */
+/** The bar at the top that closes focus mode when tapped; [modifier] adds pulling it down. */
 @Composable
 private fun Grabber(onClose: () -> Unit, modifier: Modifier = Modifier) {
     val closeLabel = stringResource(R.string.action_close)
@@ -258,6 +259,7 @@ private fun Grabber(onClose: () -> Unit, modifier: Modifier = Modifier) {
             .semantics { contentDescription = closeLabel }
             .clickable(onClick = onClose)
             .padding(horizontal = 24.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(width = 36.dp, height = 5.dp).background(Color.White.copy(alpha = 0.35f), RoundedCornerShape(50)))
     }
