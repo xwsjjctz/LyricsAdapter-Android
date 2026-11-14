@@ -10,12 +10,9 @@ package com.lyricsadapter.app.ui.glass
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -43,13 +40,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
@@ -77,60 +72,6 @@ import kotlinx.coroutines.launch
 /** The height of the tab bar, as iOS 26's. */
 internal val GLASS_BAR_HEIGHT = 64.dp
 
-/**
- * The tint over the glass: light glass on light pages, dark glass on dark
- * ones. Dense enough that the list under the bars does not read
- * through them, as on iOS.
- */
-@Composable
-internal fun glassTint(): Color {
-    val colors = LocalAppColors.current
-    return if (colors.isDark) Color(0xFF1C1C1E).copy(alpha = 0.65f) else Color(0xFFF9F9F9).copy(alpha = 0.7f)
-}
-
-/** How much the glass blurs what is under it. */
-internal val GLASS_BLUR = 16.dp
-
-/**
- * Liquid Glass behind this element: the page under it ([backdrop]) blurred,
- * made more vivid and bent at the edges like a lens, under a light tint.
- */
-@Composable
-internal fun Modifier.glass(backdrop: Backdrop, shape: Shape, lens: Dp = 16.dp): Modifier {
-    val tint = glassTint()
-    return drawBackdrop(
-        backdrop = backdrop,
-        shape = { shape },
-        effects = {
-            vibrancy()
-            blur(GLASS_BLUR.toPx())
-            lens(lens.toPx(), lens.toPx() * 2)
-        },
-        onDrawSurface = { drawRect(tint) },
-    )
-}
-
-/** How long glass takes to fade in over its stand-in once it settles. */
-private const val GLASS_FADE_MS = 180
-
-/**
- * The background of glass that springs into view: while it moves, a surface
- * in the glass's tint stands in, since creating the real glass costs more
- * than a frame and would stutter the spring; once [settled], the glass fades
- * in over it. Put it first in a `Box` around the content.
- */
-@Composable
-internal fun BoxScope.SettlingGlass(backdrop: Backdrop, shape: Shape, lens: Dp, settled: Boolean) {
-    val tint = glassTint()
-    val glass = remember { Animatable(0f) }
-    LaunchedEffect(settled) {
-        if (settled) glass.animateTo(1f, tween(GLASS_FADE_MS)) else glass.snapTo(0f)
-    }
-    Box(Modifier.matchParentSize().graphicsLayer { alpha = 1f - glass.value }.background(tint, shape))
-    // Not drawn while fully transparent, so the glass is first made once the fade starts.
-    if (settled) Box(Modifier.matchParentSize().graphicsLayer { alpha = glass.value }.glass(backdrop, shape, lens))
-}
-
 private val LocalGlassTabScale = staticCompositionLocalOf { { 1f } }
 
 /**
@@ -151,7 +92,7 @@ internal fun GlassTabBar(
     val colors = LocalAppColors.current
     val isLightTheme = !colors.isDark
     val accentColor = colors.accent
-    val containerColor = glassTint()
+    val look = glassLook()
 
     val tabsBackdrop = rememberLayerBackdrop()
 
@@ -229,13 +170,16 @@ internal fun GlassTabBar(
                         blur(GLASS_BLUR.toPx())
                         lens(24f.dp.toPx(), 24f.dp.toPx())
                     },
+                    highlight = { look.highlight },
+                    shadow = { look.shadow },
+                    innerShadow = { look.edgeGlow },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
                         val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
                         scaleX = scale
                         scaleY = scale
                     },
-                    onDrawSurface = { drawRect(containerColor) },
+                    onDrawSurface = { drawRect(look.tint) },
                 )
                 .then(interactiveHighlight.modifier)
                 .height(GLASS_BAR_HEIGHT)
@@ -265,7 +209,7 @@ internal fun GlassTabBar(
                             val progress = dampedDragAnimation.pressProgress
                             Highlight.Default.copy(alpha = progress)
                         },
-                        onDrawSurface = { drawRect(containerColor) },
+                        onDrawSurface = { drawRect(look.tint) },
                     )
                     .then(interactiveHighlight.modifier)
                     .height(56f.dp)

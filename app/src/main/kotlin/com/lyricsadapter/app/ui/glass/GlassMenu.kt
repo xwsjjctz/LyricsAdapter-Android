@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -156,7 +158,9 @@ fun Modifier.menuPress(onClick: () -> Unit, onLongPress: ((anchor: IntOffset, bo
         }
 }
 
-private val PANEL_WIDTH = 260.dp
+/** The panel is as wide as its longest item, within these. */
+private val PANEL_MIN_WIDTH = 168.dp
+private val PANEL_MAX_WIDTH = 236.dp
 private val PANEL_MARGIN = 12.dp
 private val PANEL_SHAPE = RoundedCornerShape(22.dp)
 
@@ -253,7 +257,8 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
                     scaleY = scale
                     transformOrigin = TransformOrigin(if (leftwards) 0.85f else 0.15f, if (below) 0f else 1f)
                 }
-                .width(PANEL_WIDTH)
+                .widthIn(min = PANEL_MIN_WIDTH, max = PANEL_MAX_WIDTH)
+                .width(IntrinsicSize.Max)
                 .heightIn(max = 520.dp),
         ) {
             SettlingGlass(backdrop, PANEL_SHAPE, lens = 10.dp, settled = settled)
@@ -297,7 +302,7 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
                                 }
                                 BasicText(entry.label, style = TextStyle(color = tint, fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 if (entry.detail != null) {
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(16.dp))
                                     BasicText(entry.detail, style = TextStyle(color = colors.secondaryText, fontSize = 15.sp))
                                 }
                                 if (entry.icon != null) {

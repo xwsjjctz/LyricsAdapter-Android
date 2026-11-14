@@ -13,7 +13,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
@@ -24,7 +23,9 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -107,11 +108,14 @@ import com.lyricsadapter.app.ui.glass.LocalGlassMenu
 /** The app's two pages, switched by the tab bar at the bottom. */
 private enum class MainPage { Library, Settings }
 
-/** The bottom bars' widest, so landscape keeps them together. */
+/** The stacked bottom bars' widest, on a tall screen that is also wide. */
 private val BOTTOM_BARS_MAX_WIDTH = 520.dp
 
-/** The tab bar's width in landscape, where it sits beside the mini player. */
+/** The tab bar's width in landscape, where it sits at the end of the mini player's row. */
 private val LANDSCAPE_TAB_BAR_WIDTH = 180.dp
+
+/** The mini player's widest in landscape, where it keeps to the middle of the screen. */
+private val LANDSCAPE_MINI_PLAYER_MAX_WIDTH = 480.dp
 
 /** How long a fresh start waits for the saved track's list to load before giving up on restoring it. */
 private const val RESTORE_TIMEOUT_MS = 15_000L
@@ -461,7 +465,11 @@ fun AppScreen(container: AppContainer) {
     }
 }
 
-/** The mini player above the tab bar of the two pages, or beside it when not [stacked]. */
+/**
+ * The mini player above the tab bar of the two pages. When not [stacked], on a
+ * landscape phone, they share a row: the mini player in the middle of the
+ * screen, the tab bar at the end, as far as the mini player's width leaves room.
+ */
 @Composable
 private fun BottomBars(
     page: () -> MainPage,
@@ -472,20 +480,23 @@ private fun BottomBars(
     miniPlayer: @Composable (Modifier) -> Unit,
 ) {
     val outer = modifier
-        .widthIn(max = BOTTOM_BARS_MAX_WIDTH)
         .fillMaxWidth()
-        .navigationBarsPadding()
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
         .padding(horizontal = 16.dp, vertical = BOTTOM_BAR_MARGIN)
     val tabBar: @Composable (Modifier) -> Unit = { tabModifier -> PageTabBar(page, onPage, backdrop, tabModifier) }
     if (stacked) {
-        Column(outer, verticalArrangement = Arrangement.spacedBy(BOTTOM_BAR_MARGIN)) {
-            miniPlayer(Modifier)
-            tabBar(Modifier.fillMaxWidth())
+        Box(outer, contentAlignment = Alignment.Center) {
+            Column(Modifier.widthIn(max = BOTTOM_BARS_MAX_WIDTH), verticalArrangement = Arrangement.spacedBy(BOTTOM_BAR_MARGIN)) {
+                miniPlayer(Modifier)
+                tabBar(Modifier.fillMaxWidth())
+            }
         }
     } else {
-        Row(outer, horizontalArrangement = Arrangement.spacedBy(BOTTOM_BAR_MARGIN), verticalAlignment = Alignment.CenterVertically) {
-            tabBar(Modifier.width(LANDSCAPE_TAB_BAR_WIDTH))
-            miniPlayer(Modifier.weight(1f))
+        Box(outer) {
+            // The same room is kept free on both sides, so the mini player stays centred beside the tab bar.
+            val side = LANDSCAPE_TAB_BAR_WIDTH + BOTTOM_BAR_MARGIN
+            miniPlayer(Modifier.align(Alignment.Center).padding(horizontal = side).widthIn(max = LANDSCAPE_MINI_PLAYER_MAX_WIDTH))
+            tabBar(Modifier.align(Alignment.CenterEnd).width(LANDSCAPE_TAB_BAR_WIDTH))
         }
     }
 }

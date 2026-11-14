@@ -56,11 +56,11 @@ private val SWIPE_DISTANCE = 56.dp
 
 /**
  * Apple Music's mini player: a Liquid Glass capsule over the tab bar with the
- * artwork, the title over the artist, play or pause and next. Tapping it opens focus
- * mode; swiping it sideways skips to the next or previous track, as iOS 26.1
- * does. It is always there: with nothing loaded it shows the app's icon and
- * name, play starts the list on show and next is off, as desktop's bar stays
- * with "no track selected".
+ * artwork, the title over the artist, and previous, play or pause and next.
+ * Tapping it opens focus mode; swiping it sideways skips to the next or
+ * previous track, as iOS 26.1 does. It is always there: with nothing loaded
+ * it shows the app's icon and name, play starts the list on show and the
+ * skip buttons are off, as desktop's bar stays with "no track selected".
  */
 @Composable
 fun MiniPlayer(
@@ -97,7 +97,8 @@ fun MiniPlayer(
                     travelled += amount
                 }
             }
-            .padding(start = 8.dp, end = 6.dp),
+            // The artwork keeps clear of the capsule's round end.
+            .padding(start = 16.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (track != null) {
@@ -109,7 +110,7 @@ fun MiniPlayer(
                 modifier = Modifier.size(COVER_SIZE).clip(RoundedCornerShape(10.dp)),
             )
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             BasicText(
                 track?.title ?: stringResource(R.string.app_name),
@@ -124,26 +125,34 @@ fun MiniPlayer(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(
+        TransportButton(R.drawable.ui_fast_rewind_filled, stringResource(R.string.action_previous), enabled = loaded, onClick = onPrevious)
+        TransportButton(
             icon = if (isPlaying) R.drawable.ui_pause_filled else R.drawable.ui_play_arrow_filled,
             label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
-            tint = colors.text,
-            size = 26.dp,
+            enabled = true,
             onClick = onTogglePlay,
         )
-        if (loaded) {
-            IconButton(R.drawable.ui_fast_forward_filled, stringResource(R.string.action_next), tint = colors.text, size = 26.dp, onClick = onNext)
-        } else {
-            val label = stringResource(R.string.action_next)
-            Box(
-                Modifier.size(48.dp).semantics {
-                    contentDescription = label
-                    disabled()
-                },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(R.drawable.ui_fast_forward_filled, colors.text.copy(alpha = 0.3f), size = 26.dp)
-            }
+        TransportButton(R.drawable.ui_fast_forward_filled, stringResource(R.string.action_next), enabled = loaded, onClick = onNext)
+    }
+}
+
+private val TRANSPORT_ICON_SIZE = 24.dp
+
+/** One of the mini player's controls; dimmed and inert while there is nothing to skip from. */
+@Composable
+private fun TransportButton(icon: Int, label: String, enabled: Boolean, onClick: () -> Unit) {
+    val colors = LocalAppColors.current
+    if (enabled) {
+        IconButton(icon, label, tint = colors.text, size = TRANSPORT_ICON_SIZE, onClick = onClick)
+    } else {
+        Box(
+            Modifier.size(TRANSPORT_ICON_SIZE + 20.dp).semantics {
+                contentDescription = label
+                disabled()
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, colors.text.copy(alpha = 0.3f), size = TRANSPORT_ICON_SIZE)
         }
     }
 }

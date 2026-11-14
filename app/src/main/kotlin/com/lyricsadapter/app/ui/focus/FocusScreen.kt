@@ -67,7 +67,9 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.runtime.mutableStateOf
@@ -284,28 +286,50 @@ private fun PortraitHeader(track: Track, modifier: Modifier = Modifier) {
     }
 }
 
-/** Desktop's landscape artwork column: a large rounded cover with the title, artist and album centred under it. */
+/** The least the landscape cover shrinks to on a short screen. */
+private val LANDSCAPE_COVER_MIN = 72.dp
+
+/** Kept free over the cover and under its text, so neither touches the system bars. */
+private val LANDSCAPE_ARTWORK_MARGIN = 10.dp
+
+/**
+ * Desktop's landscape artwork column: a large rounded cover with the title,
+ * artist and album centred under it. The text is measured first and the cover
+ * takes what height is left, up to [coverSize], so a short screen shrinks
+ * the cover instead of pushing the text off it.
+ */
 @Composable
 private fun LandscapeArtwork(track: Track, coverSize: Dp, onContentHeight: (Dp) -> Unit, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        // Short screens keep room for the three lines of text under the cover.
-        val cover = minOf(coverSize, maxWidth, maxHeight - 96.dp).coerceAtLeast(96.dp)
-        Column(
-            Modifier.onSizeChanged { onContentHeight(with(density) { it.height.toDp() }) },
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Cover(track.coverPath, size = cover, cornerRadius = 16.dp)
-            Spacer(Modifier.height(20.dp))
-            BasicText(
-                track.title,
-                style = TextStyle(Color.White, 24.sp, FontWeight.ExtraBold, fontFamily = FocusFonts.display, lineHeight = 29.sp, letterSpacing = (-0.025).em, textAlign = TextAlign.Center),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // Desktop's landscape title keeps `mb-2`; its artist line is `text-base`, 1.5 line height.
-            Spacer(Modifier.height(8.dp))
-            TrackDetails(track, artistSize = 16, centred = true, lineHeight = 1.5f)
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Layout(
+            content = {
+                Cover(track.coverPath, size = coverSize, cornerRadius = 16.dp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(20.dp))
+                    BasicText(
+                        track.title,
+                        style = TextStyle(Color.White, 24.sp, FontWeight.ExtraBold, fontFamily = FocusFonts.display, lineHeight = 29.sp, letterSpacing = (-0.025).em, textAlign = TextAlign.Center),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    // Desktop's landscape title keeps `mb-2`; its artist line is `text-base`, 1.5 line height.
+                    Spacer(Modifier.height(8.dp))
+                    TrackDetails(track, artistSize = 16, centred = true, lineHeight = 1.5f)
+                }
+            },
+            modifier = Modifier.onSizeChanged { onContentHeight(with(density) { it.height.toDp() }) },
+        ) { (cover, text), constraints ->
+            val textPlaceable = text.measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val room = constraints.maxHeight - textPlaceable.height - 2 * LANDSCAPE_ARTWORK_MARGIN.roundToPx()
+            val side = minOf(coverSize.roundToPx(), constraints.maxWidth, room)
+                .coerceAtLeast(LANDSCAPE_COVER_MIN.roundToPx())
+            val coverPlaceable = cover.measure(Constraints.fixed(side, side))
+            val width = maxOf(side, textPlaceable.width)
+            layout(width, side + textPlaceable.height) {
+                coverPlaceable.place((width - side) / 2, 0)
+                textPlaceable.place((width - textPlaceable.width) / 2, side)
+            }
         }
     }
 }

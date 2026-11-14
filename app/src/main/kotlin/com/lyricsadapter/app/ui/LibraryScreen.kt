@@ -73,6 +73,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import com.lyricsadapter.app.ui.glass.MenuPreview
 import com.lyricsadapter.app.ui.glass.menuPress
+import com.lyricsadapter.app.ui.glass.scrollEdge
+import com.lyricsadapter.app.ui.search.SEARCH_FIELD_HEIGHT
 
 /** What a slot is called and drawn with, as desktop's sidebar and palette name them. */
 internal val SlotId.titleRes: Int
@@ -219,10 +221,17 @@ fun LibraryScreen(
                 )
             }
         }
-        // The header stays put; the list scrolls under it and, past the title, under the glass search field.
-        // Its background spans the whole width, so the wide poster wall does not show beside it.
+        // The header stays put and has no fill of its own: the list scrolls under it and sinks into the scroll
+        // edge, which starts easing out behind the search field and ends a little under the header. It spans
+        // the whole width, so the wide poster wall fades beside the header too.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(headerHeight + EDGE_TAIL)
+                .scrollEdge(listBackdrop, colors.background, fade = EDGE_TAIL + if (selection == null) SEARCH_FIELD_HEIGHT + 12.dp else 12.dp),
+        )
         Column(Modifier.fillMaxWidth().onSizeChanged { headerHeight = with(density) { it.height.toDp() } }, horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.fillMaxWidth().background(colors.background).padding(top = contentPadding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.fillMaxWidth().padding(top = contentPadding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
                 Column(Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth()) {
                     if (selection != null) {
                         SelectionHeader(tracks, selection, onSelectionChange)
@@ -291,6 +300,9 @@ fun LibraryScreen(
         )
     }
 }
+
+/** How far under the header its scroll edge reaches before it has faded out. */
+private val EDGE_TAIL = 16.dp
 
 /** The list's widest, so landscape keeps rows a readable length. */
 private val MAX_CONTENT_WIDTH = 720.dp
