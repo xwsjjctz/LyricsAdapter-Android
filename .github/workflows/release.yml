@@ -114,16 +114,7 @@ jobs:
       - name: Verify the signature, version and page size
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
-          APK="release/LyricsAdapter-${VERSION}-android.apk"
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | grep -E 'Signer #1 certificate (DN|SHA-256)'
-          BUILT=$("$BUILD_TOOLS/aapt2" dump badging "$APK" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
-          if [ "$BUILT" != "$VERSION" ]; then
-            echo "::error::The APK reports version '${BUILT}', expected '${VERSION}'."
-            exit 1
-          fi
-          python3 tools/ci/check_page_size.py "$APK"
+        run: tools/ci/verify_apk.sh "release/LyricsAdapter-${VERSION}-android.apk"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
