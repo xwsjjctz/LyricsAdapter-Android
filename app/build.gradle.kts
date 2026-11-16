@@ -15,6 +15,16 @@ val releaseKey: Properties? = rootProject.file("keystore.properties").takeIf { i
     Properties().apply { file.inputStream().use { load(it) } }
 }
 
+/** The app's version, in the root `gradle.properties`; a release is cut from whatever it says (see .github/workflows/release.yml). */
+val appVersionName: String = providers.gradleProperty("appVersionName").get()
+
+/**
+ * 1.2.3 becomes 1002003, so a later version always installs over an earlier
+ * one. A pre-release suffix (1.2.3-beta.1) does not count.
+ */
+val appVersionCode: Int = appVersionName.substringBefore('-').split('.').map(String::toInt)
+    .let { (major, minor, patch) -> major * 1_000_000 + minor * 1_000 + patch }
+
 /** ABIs the app ships; the Rust library is built for each, other libraries' extra ABIs are dropped. */
 val appAbis = listOf("arm64-v8a", "x86_64")
 
@@ -36,9 +46,8 @@ android {
         applicationId = "com.lyricsadapter.app"
         minSdk = 30
         targetSdk = 36
-        // Release builds take these from the tag (see .github/workflows/release.yml).
-        versionCode = providers.gradleProperty("appVersionCode").orNull?.toInt() ?: 1
-        versionName = providers.gradleProperty("appVersionName").orNull ?: "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         ndk {
             abiFilters.addAll(appAbis)
         }

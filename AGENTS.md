@@ -167,11 +167,18 @@ values in tests (as `LegacyMusicPluginTest` does with vectors produced by Node).
 
 ## Releases
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the
-signed release APK (version name from the tag) and attaches it to the tag's
-GitHub release. It needs the `ANDROID_KEYSTORE_BASE64`,
+Releases follow desktop's flow. The version is `appVersionName` in the root
+`gradle.properties` (the version code is derived from it). Work reaches
+`master` through a pull request from `dev`, which runs
+`.github/workflows/pr-check.yml` (the JVM tests and `:app:assembleProfile`).
+`.github/workflows/release.yml` is run by hand
+(`gh workflow run release.yml --ref master`): it refuses a version that
+already has a tag or release, builds the signed APK, uploads it to a draft
+release and then publishes the draft, which is what creates the `v<version>`
+tag. Never push a `v*` tag yourself. `v0.*` and suffixed versions are marked
+pre-release. It needs the `ANDROID_KEYSTORE_BASE64`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`
-secrets. Release builds use R8: keep rules for reflection-based code (JNA and
+secrets and fails without them. Release builds use R8: keep rules for reflection-based code (JNA and
 the UniFFI bindings) live in `app/proguard-rules.pro`, and resources must be
 loaded by absolute path, because R8 moves classes between packages.
 

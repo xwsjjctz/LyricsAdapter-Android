@@ -15,3 +15,6 @@ ref/
 keystore.properties
 *.jks
 *.keystore
+# Python caches (they embed the absolute path of the source)
+__pycache__/
+*.pyc

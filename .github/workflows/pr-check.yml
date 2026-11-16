@@ -1,0 +1,73 @@
+name: PR Check
+
+# 合并到 master 之前的检查；也可以手动运行（`gh workflow run pr-check.yml --ref dev`）。
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # audio-tags 的测试会先用 cargo 为本机编译 Rust 库。
+      - name: Unit tests
+        run: ./gradlew :plugin-host:test :audio-tags:test :lyrics:test :library:test :webdav:test
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: "*/build/reports/tests"
+          if-no-files-found: ignore
+          retention-days: 7
+
+  build:
+    name: Android build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Rust for Android
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          cargo install cargo-ndk --version 4.1.2 --locked
+
+      # profile 是正式版的代码（R8）加 debug 签名：不需要密钥，也能在发布前发现 R8 规则的问题。
+      - name: Build the release code
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+        run: ./gradlew :app:assembleProfile

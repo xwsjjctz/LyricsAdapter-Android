@@ -60,7 +60,12 @@ adb shell am start -n com.lyricsadapter.spike/.lyrics.LyricsSpikeActivity --ez b
 
 ## 发布
 
-APK 只发在 GitHub Release。推送 `v*` 标签时 `.github/workflows/release.yml` 构建签名的正式版，版本名取自标签，并附到该标签的 Release。仓库需要四个 secret：`ANDROID_KEYSTORE_BASE64`（`.jks` 的 base64）、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。
+APK 只发在 GitHub Release，流程与桌面端一致：
+
+1. 在 `dev` 上把根目录 `gradle.properties` 的 `appVersionName` 改成新版本号，提 PR 到 `master`；`.github/workflows/pr-check.yml` 跑单元测试并构建一次正式版代码。
+2. 合并后手动运行 Release（Actions → Release → Run workflow，或 `gh workflow run release.yml --ref master`）。它构建签名的 APK，先建草稿 Release、上传完成后再公开，`v<版本号>` 标签在公开的那一刻才创建；版本号已经发布过时直接拒绝。`v0.*` 和带后缀的版本（如 `1.0.0-beta.1`）标为 Pre-release。
+
+仓库需要四个 secret：`ANDROID_KEYSTORE_BASE64`（`.jks` 的 base64）、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`，缺任何一个 Release 都会失败。
 
 生成签名密钥（只做一次，丢失后已安装的用户无法升级，务必备份）：
 
