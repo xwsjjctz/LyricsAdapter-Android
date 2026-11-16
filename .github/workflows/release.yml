@@ -101,15 +101,17 @@ jobs:
 
       - name: Build the signed APK
         env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
+          # runner 默认的 NDK 较旧（r27，按 4 KB 页链接），所以指定镜像里最新的那个。
+          export ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" ANDROID_NDK_ROOT="$ANDROID_NDK_LATEST_HOME"
           ./gradlew :app:assembleRelease
           mkdir -p release
           cp app/build/outputs/apk/release/app-release.apk "release/LyricsAdapter-${VERSION}-android.apk"
 
-      # An APK that came out unsigned, or carrying another version, must not reach the release.
-      - name: Verify the signature and version
+      # An APK that came out unsigned, carrying another version, or unable to
+      # load on 16 KB page devices must not reach the release.
+      - name: Verify the signature, version and page size
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
@@ -121,6 +123,7 @@ jobs:
             echo "::error::The APK reports version '${BUILT}', expected '${VERSION}'."
             exit 1
           fi
+          python3 tools/ci/check_page_size.py "$APK"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

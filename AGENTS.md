@@ -50,6 +50,7 @@ Change them only when the owner asks.
 | `app/` | The Android app: SAF import into Room, Media3 playback service, the playlist page (search pinned over the list) and settings under iOS 26 Apple Music style Liquid Glass controls (`ui/glass/` on Kyant0's Backdrop library: the mini player over a draggable tab bar, menus drawn in the page, one edge look for all glass in `GlassSurface.kt`, the header's scroll edge), last playback restored on start, online downloads and focus mode |
 | `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
 | `tools/icons/` | `generate.py` writes the `ui_*`/`ms_*` drawables from desktop's Material Symbols Rounded font (`node_modules/material-symbols`) at the axes desktop's CSS uses: FILL 0 opsz 24 by default, FILL 1 opsz 48 in focus mode |
+| `tools/ci/` | `check_page_size.py <apk>` fails unless every native library in the APK loads on 16 KB page devices; both workflows run it |
 | `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
 | `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
 
@@ -171,6 +172,8 @@ Releases follow desktop's flow. The version is `appVersionName` in the root
 `gradle.properties` (the version code is derived from it). Work reaches
 `master` through a pull request from `dev`, which runs
 `.github/workflows/pr-check.yml` (the JVM tests and `:app:assembleProfile`).
+Both workflows build with the runner's newest NDK (`ANDROID_NDK_LATEST_HOME`,
+read in the shell: the `env` context does not hold the runner's variables).
 `.github/workflows/release.yml` is run by hand
 (`gh workflow run release.yml --ref master`): it refuses a version that
 already has a tag or release, builds the signed APK, uploads it to a draft
