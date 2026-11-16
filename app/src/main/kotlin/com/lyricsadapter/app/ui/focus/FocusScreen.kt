@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -59,17 +60,29 @@ import com.lyricsadapter.app.playback.PlayerState
 import com.lyricsadapter.app.playback.SystemVolume
 import com.lyricsadapter.app.ui.Cover
 import com.lyricsadapter.library.Track
+import com.lyricsadapter.lyrics.ParsedLyrics
 import kotlinx.coroutines.launch
 import com.lyricsadapter.app.ui.blocksTouches
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.runtime.mutableStateOf
 
-/** How far the header must be pulled down to close focus mode. */
+/** How far the grabber or the header must be pulled down to close focus mode. */
 private val DISMISS_DISTANCE = 120.dp
 
 /** The lyrics run on under the controls; this much at the bottom is theirs while they show. */
 private val CONTROLS_SPACE = FOCUS_CONTROLS_HEIGHT + FOCUS_CONTROLS_BOTTOM
 private const val CONTROLS_FADE_MS = 200
 
-/** Scrolling the lyrics by hand shows the controls until the lyrics follow the song again. */
+/** Dragging the lyrics shows the controls while the finger is down, like a touch on them. */
 private const val SCROLL_HOLD = "scroll"
 
 /** Landscape: the artwork column's share of the width, and its cover's share of the height. */
@@ -92,19 +105,22 @@ private const val LANDSCAPE_LYRICS_HEIGHT = 0.6f
  * title sit above the lyrics and the controls under them, as desktop's
  * portrait layout; in landscape the cover and title fill the left side and
  * the lyrics the right, and the controls take the cover's place while they
- * show. Pulling the cover down or tapping the grabber closes it.
+ * show. Pulling the grabber or the cover down, or tapping the grabber, closes it.
  */
 @Composable
 fun FocusScreen(
     track: Track,
+    /** [track]'s lyrics, parsed by the caller, which needs them too. */
+    lyrics: ParsedLyrics,
     playback: PlayerState,
     player: PlayerConnection,
     volume: SystemVolume,
     settings: FocusSettings,
     translation: FocusTranslation,
+    /** False while the page is still sliding in: the lyrics then lay out only the lines on show. */
+    arrived: Boolean,
     onClose: () -> Unit,
 ) {
-    val lyrics = remember(track.id) { track.parsedLyrics() }
     val clock = rememberFocusClock(player, playback.isPlaying, track.id)
     val volumeLevel by volume.level.collectAsStateWithLifecycle(initialValue = volume.current())
     LightSystemBars(false)
@@ -132,7 +148,11 @@ fun FocusScreen(
                 lyrics.isSynced -> LyricsView(
                     lines = lyrics.lines,
                     position = { clock.positionMs },
-                    onLineClick = { line -> seek(line.startMs) },
+                    // A tap on a line is a wish to hear it, as on desktop: it also starts playback.
+                    onLineClick = { line ->
+                        seek(line.startMs)
+                        player.resume()
+                    },
                     modifier = Modifier.fillMaxSize(),
                     controlsHeight = controlsSpace,
                     controlsShown = { controlsAlpha },
@@ -140,7 +160,8 @@ fun FocusScreen(
                     anchor = anchor,
                     linePadding = linePadding,
                     translations = translation.lines,
-                    onScrollingChange = { scrolling -> if (scrolling) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
+                    layOutAll = arrived,
+                    onDraggingChange = { dragging -> if (dragging) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
                 )
                 lyrics.plainText.isNotEmpty() -> BasicText(
                     lyrics.plainText,
@@ -156,6 +177,8 @@ fun FocusScreen(
             }
         }
     }
+    // Only composed while they show at all, so hidden controls leave the lyrics under them to the finger.
+    val controlsComposed by remember { derivedStateOf { controlsAlpha > 0f } }
     val controls: @Composable (Modifier) -> Unit = { modifier ->
         FocusControls(
             position = { clock.positionMs },
@@ -176,6 +199,13 @@ fun FocusScreen(
             modifier = modifier.wakesControls(idle).graphicsLayer { alpha = controlsAlpha },
         )
     }
+    /** The controls, with [below] more room under them; while hidden, touches from their transport row down reveal them. */
+    val controlsArea: @Composable (Modifier, Dp) -> Unit = { modifier, below ->
+        Box(modifier.fillMaxWidth().height(FOCUS_CONTROLS_HEIGHT + below)) {
+            if (controlsComposed) controls(Modifier.align(Alignment.TopCenter))
+            if (!idle.shown) Box(Modifier.fillMaxSize().padding(top = FOCUS_CONTROLS_WAKE_TOP).wakesControls(idle))
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().blocksTouches().graphicsLayer { translationY = dismiss }) {
         if (settings.flowingBackground && flowingBackgroundSupported) {
@@ -186,38 +216,48 @@ fun FocusScreen(
         if (maxWidth > maxHeight) {
             val gap = (maxWidth * LANDSCAPE_GAP_SHARE).coerceIn(20.dp, 48.dp)
             val cover = (maxWidth * LANDSCAPE_COVER_SHARE).coerceIn(140.dp, 280.dp)
+            // The lyrics column takes the height of the cover and its text, so both columns line up.
+            var artworkHeight by remember { mutableStateOf(Dp.Unspecified) }
             Row(
                 Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = LANDSCAPE_SIDES),
                 horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(LANDSCAPE_ARTWORK_WEIGHT).fillMaxHeight()) {
-                    LandscapeArtwork(track, cover, Modifier.fillMaxSize().graphicsLayer { alpha = 1f - controlsAlpha }.then(dismissDrag))
-                    controls(Modifier.align(Alignment.Center))
-                    // Over the artwork, so it never covers the lyrics.
-                    Grabber(onClose, Modifier.align(Alignment.TopCenter))
+                    LandscapeArtwork(
+                        track,
+                        cover,
+                        onContentHeight = { artworkHeight = it },
+                        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - controlsAlpha }.then(dismissDrag),
+                    )
+                    controlsArea(Modifier.align(Alignment.Center), 0.dp)
                 }
                 lyricsPane(
-                    Modifier.weight(LANDSCAPE_LYRICS_WEIGHT).fillMaxHeight(LANDSCAPE_LYRICS_HEIGHT),
+                    Modifier
+                        .weight(LANDSCAPE_LYRICS_WEIGHT)
+                        .then(if (artworkHeight.isSpecified) Modifier.height(artworkHeight) else Modifier.fillMaxHeight(LANDSCAPE_LYRICS_HEIGHT)),
                     0.dp,
                     LyricsAnchor.Centre,
                     settings.fontSize.dp,
                 )
             }
+            // Over the middle of the page, in the top margin that both columns leave free.
+            Grabber(onClose, Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).then(dismissDrag))
         } else {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                Grabber(onClose, Modifier.align(Alignment.CenterHorizontally))
+                // The whole width, so the finger need not find the small bar.
+                Grabber(onClose, Modifier.fillMaxWidth().then(dismissDrag))
                 PortraitHeader(track, dismissDrag)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     lyricsPane(Modifier.fillMaxSize(), CONTROLS_SPACE, LyricsAnchor.Top, LINE_PADDING)
-                    controls(Modifier.align(Alignment.BottomCenter).padding(bottom = FOCUS_CONTROLS_BOTTOM))
+                    controlsArea(Modifier.align(Alignment.BottomCenter), FOCUS_CONTROLS_BOTTOM)
                 }
             }
         }
     }
 }
 
-/** The bar at the top that closes focus mode when tapped. */
+/** The bar at the top that closes focus mode when tapped; [modifier] adds pulling it down. */
 @Composable
 private fun Grabber(onClose: () -> Unit, modifier: Modifier = Modifier) {
     val closeLabel = stringResource(R.string.action_close)
@@ -226,6 +266,7 @@ private fun Grabber(onClose: () -> Unit, modifier: Modifier = Modifier) {
             .semantics { contentDescription = closeLabel }
             .clickable(onClick = onClose)
             .padding(horizontal = 24.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(width = 36.dp, height = 5.dp).background(Color.White.copy(alpha = 0.35f), RoundedCornerShape(50)))
     }
@@ -250,24 +291,50 @@ private fun PortraitHeader(track: Track, modifier: Modifier = Modifier) {
     }
 }
 
-/** Desktop's landscape artwork column: a large rounded cover with the title, artist and album centred under it. */
+/** The least the landscape cover shrinks to on a short screen. */
+private val LANDSCAPE_COVER_MIN = 72.dp
+
+/** Kept free over the cover and under its text, so neither touches the system bars. */
+private val LANDSCAPE_ARTWORK_MARGIN = 10.dp
+
+/**
+ * Desktop's landscape artwork column: a large rounded cover with the title,
+ * artist and album centred under it. The text is measured first and the cover
+ * takes what height is left, up to [coverSize], so a short screen shrinks
+ * the cover instead of pushing the text off it.
+ */
 @Composable
-private fun LandscapeArtwork(track: Track, coverSize: Dp, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
-        // Short screens keep room for the three lines of text under the cover.
-        val cover = minOf(coverSize, maxWidth, maxHeight - 96.dp).coerceAtLeast(96.dp)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Cover(track.coverPath, size = cover, cornerRadius = 16.dp)
-            Spacer(Modifier.height(20.dp))
-            BasicText(
-                track.title,
-                style = TextStyle(Color.White, 24.sp, FontWeight.ExtraBold, fontFamily = FocusFonts.display, lineHeight = 29.sp, letterSpacing = (-0.025).em, textAlign = TextAlign.Center),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // Desktop's landscape title keeps `mb-2`; its artist line is `text-base`, 1.5 line height.
-            Spacer(Modifier.height(8.dp))
-            TrackDetails(track, artistSize = 16, centred = true, lineHeight = 1.5f)
+private fun LandscapeArtwork(track: Track, coverSize: Dp, onContentHeight: (Dp) -> Unit, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Layout(
+            content = {
+                Cover(track.coverPath, size = coverSize, cornerRadius = 16.dp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(20.dp))
+                    BasicText(
+                        track.title,
+                        style = TextStyle(Color.White, 24.sp, FontWeight.ExtraBold, fontFamily = FocusFonts.display, lineHeight = 29.sp, letterSpacing = (-0.025).em, textAlign = TextAlign.Center),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    // Desktop's landscape title keeps `mb-2`; its artist line is `text-base`, 1.5 line height.
+                    Spacer(Modifier.height(8.dp))
+                    TrackDetails(track, artistSize = 16, centred = true, lineHeight = 1.5f)
+                }
+            },
+            modifier = Modifier.onSizeChanged { onContentHeight(with(density) { it.height.toDp() }) },
+        ) { (cover, text), constraints ->
+            val textPlaceable = text.measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val room = constraints.maxHeight - textPlaceable.height - 2 * LANDSCAPE_ARTWORK_MARGIN.roundToPx()
+            val side = minOf(coverSize.roundToPx(), constraints.maxWidth, room)
+                .coerceAtLeast(LANDSCAPE_COVER_MIN.roundToPx())
+            val coverPlaceable = cover.measure(Constraints.fixed(side, side))
+            val width = maxOf(side, textPlaceable.width)
+            layout(width, side + textPlaceable.height) {
+                coverPlaceable.place((width - side) / 2, 0)
+                textPlaceable.place((width - textPlaceable.width) / 2, side)
+            }
         }
     }
 }

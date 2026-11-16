@@ -5,4 +5,12 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+
+    <!--
+        The activity's theme in the manifest, so the system's launch window shows the logo on its colour,
+        as the startup screen does once the app draws; MainActivity switches to the theme above.
+    -->
+    <style name="Theme.LyricsAdapter.Launch">
+        <item name="android:windowBackground">@drawable/startup_window</item>
+    </style>
 </resources>

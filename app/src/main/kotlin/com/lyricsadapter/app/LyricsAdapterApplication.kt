@@ -5,6 +5,7 @@ import android.content.Context
 import com.lyricsadapter.app.data.AppSettings
 import com.lyricsadapter.app.data.CloudLibrary
 import com.lyricsadapter.app.data.CoverStore
+import com.lyricsadapter.app.data.FolderScanner
 import com.lyricsadapter.app.data.LibraryDatabase
 import com.lyricsadapter.app.data.LibraryRepository
 import com.lyricsadapter.app.data.SecretStore
@@ -38,6 +39,9 @@ class AppContainer(context: Context) {
         resolver = context.contentResolver,
         tracks = database.tracks(),
         reader = TrackReader(context.contentResolver, CoverStore(File(context.filesDir, "covers"))),
+        scanner = FolderScanner(context.contentResolver),
+        folders = settings.libraryFolders,
+        exclusions = settings.folderExclusions,
     )
     val cloud = CloudLibrary(
         settings = settings,
@@ -56,6 +60,9 @@ class AppContainer(context: Context) {
     val online = OnlineLibrary(sources, File(context.filesDir, "online-library.json"), scope)
     val downloads = OnlineDownloads(context.contentResolver, sources, library, File(context.cacheDir, "downloads"), scope)
     val player = PlayerConnection(context)
+
+    /** Whether this process has shown its startup screen: once per launch, not again when the activity is recreated. */
+    var startupShown = false
     val volume = SystemVolume(context)
 }
 

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,6 +52,8 @@ import com.lyricsadapter.app.ui.PillButton
 import com.lyricsadapter.webdav.WebDavClient
 import com.lyricsadapter.webdav.WebDavConfig
 import com.lyricsadapter.webdav.WebDavException
+import com.lyricsadapter.app.data.FolderScanner
+import com.lyricsadapter.app.ui.ConfirmDialog
 import kotlinx.coroutines.launch
 import com.lyricsadapter.app.ui.blocksTouches
 
@@ -67,9 +70,13 @@ enum class SettingsPage(val titleRes: Int) {
 /** Where settings are open: a page, and within the plugins page one plugin and its login. */
 private data class SettingsLocation(val page: SettingsPage, val plugin: String? = null, val login: Boolean = false)
 
-/** Settings as a grouped list; each section opens as its own page and back returns one level. */
+/**
+ * Settings as a grouped list; each section opens as its own page and back
+ * returns one level. As a tab ([onClose] null) the list has a large title and
+ * no back button, and [bottomPadding] keeps its end clear of the tab bar.
+ */
 @Composable
-fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: () -> Unit) {
+fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: (() -> Unit)?, bottomPadding: Dp = 0.dp) {
     val colors = LocalAppColors.current
     val settings = container.settings
     var location by remember { mutableStateOf(SettingsLocation(initialPage)) }
@@ -79,14 +86,15 @@ fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: 
         location = when {
             location.login -> location.copy(login = false)
             location.plugin != null -> location.copy(plugin = null)
-            page == SettingsPage.Root || page == initialPage -> {
-                onClose()
+            page == SettingsPage.Root || page == initialPage && onClose != null -> {
+                onClose?.invoke()
                 location
             }
             else -> SettingsLocation(SettingsPage.Root)
         }
     }
-    BackHandler(onBack = back)
+    val atRoot = location == SettingsLocation(SettingsPage.Root)
+    BackHandler(enabled = onClose != null || !atRoot, onBack = back)
     val title = when {
         location.login -> stringResource(R.string.qr_title)
         location.plugin != null -> plugins.firstOrNull { it.id == location.plugin }?.manifest?.name ?: stringResource(page.titleRes)
@@ -94,14 +102,22 @@ fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: 
     }
 
     Column(Modifier.fillMaxSize().blocksTouches().background(colors.background).safeDrawingPadding().imePadding()) {
-        Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(R.drawable.ui_arrow_back, stringResource(R.string.back), tint = colors.accent, onClick = back)
+        if (onClose == null && atRoot) {
             BasicText(
                 title,
-                style = TextStyle(color = colors.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
-                modifier = Modifier.weight(1f),
+                style = TextStyle(color = colors.text, fontSize = 32.sp, fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
             )
-            Spacer(Modifier.width(44.dp))
+        } else {
+            Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(R.drawable.ui_arrow_back, stringResource(R.string.back), tint = colors.accent, onClick = back)
+                BasicText(
+                    title,
+                    style = TextStyle(color = colors.text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(44.dp))
+            }
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
             when {
@@ -114,14 +130,14 @@ fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: 
                 )
                 else -> when (page) {
                 SettingsPage.Root -> RootPage(container, onOpen = { location = SettingsLocation(it) })
-                SettingsPage.General -> GeneralPage(settings)
+                SettingsPage.General -> GeneralPage(container)
                 SettingsPage.Focus -> FocusPage(settings)
                 SettingsPage.Cloud -> CloudPage(settings)
                 SettingsPage.Plugins -> PluginsPage(container, onOpenPlugin = { location = location.copy(plugin = it) })
                 SettingsPage.About -> AboutPage()
                 }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp + bottomPadding))
         }
     }
 }
@@ -155,7 +171,8 @@ private fun RootPage(container: AppContainer, onOpen: (SettingsPage) -> Unit) {
 }
 
 @Composable
-private fun GeneralPage(settings: AppSettings) {
+private fun GeneralPage(container: AppContainer) {
+    val settings = container.settings
     val mode by settings.colorMode.value.collectAsStateWithLifecycle()
     if (AppLanguage.supported) LanguageGroup()
     SettingsGroup(title = stringResource(R.string.settings_appearance)) {
@@ -167,6 +184,39 @@ private fun GeneralPage(settings: AppSettings) {
             ),
             selected = mode,
             onSelect = settings.colorMode::set,
+        )
+    }
+    FoldersGroup(container)
+}
+
+/** The folders the local library follows; tapping one asks to remove it, and its songs with it. */
+@Composable
+private fun FoldersGroup(container: AppContainer) {
+    val folders by container.settings.libraryFolders.value.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var removing by remember { mutableStateOf<String?>(null) }
+    SettingsGroup(title = stringResource(R.string.settings_folders), footer = stringResource(R.string.settings_folders_footer)) {
+        if (folders.isEmpty()) SettingsRow(stringResource(R.string.settings_folders_empty))
+        folders.forEachIndexed { index, folder ->
+            if (index > 0) RowDivider(indent = true)
+            SettingsRow(
+                FolderScanner.label(Uri.parse(folder)),
+                icon = R.drawable.ui_folder,
+                detail = stringResource(R.string.remove),
+                chevron = false,
+                onClick = { removing = folder },
+            )
+        }
+    }
+    removing?.let { folder ->
+        ConfirmDialog(
+            title = stringResource(R.string.folder_remove_title),
+            message = stringResource(R.string.remove_confirm_message),
+            confirmLabel = stringResource(R.string.remove),
+            cancelLabel = stringResource(R.string.cancel),
+            danger = true,
+            onConfirm = { scope.launch { container.library.removeFolder(Uri.parse(folder)) } },
+            onDismiss = { removing = null },
         )
     }
 }

@@ -13,7 +13,7 @@
     <string name="empty_local">Import the MP3 and FLAC files on your phone</string>
     <string name="empty_cloud">Connect WebDAV and your cloud library appears here</string>
     <string name="empty_online">Online songs you play or add from search appear here</string>
-    <string name="empty_playlist">Sign in to a music source to open its playlists from search</string>
+    <string name="empty_playlist">Sign in to a music source, then open its playlists from the menu under the title</string>
     <string name="open_settings">Open Settings</string>
     <string name="empty_no_sources">Install a music source plugin to search and play online music</string>
     <string name="open_plugins">Manage plugins</string>
@@ -23,6 +23,11 @@
     <string name="cloud_refresh">Refresh cloud library</string>
     <string name="retry">Retry</string>
     <string name="import_files">Import Files</string>
+    <string name="import_folder">Import Folder</string>
+    <string name="rescan_folders">Rescan Folders</string>
+    <string name="import_progress">Importing %1$d / %2$d…</string>
+    <string name="import_nothing_new">No new songs</string>
+    <string name="import_folder_failed">This folder can\'t be read</string>
     <plurals name="import_done">
         <item quantity="one">Imported %d song</item>
         <item quantity="other">Imported %d songs</item>
@@ -49,6 +54,9 @@
     </plurals>
     <string name="unknown_artist">Unknown Artist</string>
     <string name="search">Search</string>
+    <string name="tab_library">Playlist</string>
+    <string name="mini_player_idle">Tap a song to start playing</string>
+    <string name="more_actions">More</string>
     <string name="cancel">Cancel</string>
     <string name="done">Done</string>
     <string name="save">Save</string>
@@ -110,6 +118,10 @@
     <string name="cloud_not_connected">Not connected</string>
     <string name="settings_language">Language</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_folders">Local Folders</string>
+    <string name="settings_folders_footer">Songs added to a folder are imported when the app opens. Removing a folder takes its songs out of the library; the audio files are kept.</string>
+    <string name="settings_folders_empty">No folders imported yet</string>
+    <string name="folder_remove_title">Remove this folder?</string>
     <string name="appearance_system">Match System</string>
     <string name="focus_background">Background</string>
     <string name="focus_flowing_background">Flowing Background</string>

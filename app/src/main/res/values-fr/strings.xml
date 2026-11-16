@@ -14,7 +14,7 @@
     <string name="empty_local">Importez les fichiers MP3 et FLAC de votre téléphone</string>
     <string name="empty_cloud">Connectez WebDAV et votre bibliothèque cloud apparaîtra ici</string>
     <string name="empty_online">Les titres en ligne lus ou ajoutés depuis la recherche apparaissent ici</string>
-    <string name="empty_playlist">Connectez-vous à une source musicale pour ouvrir ses playlists depuis la recherche</string>
+    <string name="empty_playlist">Connectez-vous à une source musicale, puis ouvrez ses playlists depuis le menu du titre</string>
     <string name="open_settings">Ouvrir les paramètres</string>
     <string name="empty_no_sources">Installez un plugin de source musicale pour rechercher et lire de la musique en ligne</string>
     <string name="open_plugins">Gérer les plugins</string>
@@ -24,6 +24,11 @@
     <string name="cloud_refresh">Actualiser la bibliothèque cloud</string>
     <string name="retry">Réessayer</string>
     <string name="import_files">Importer</string>
+    <string name="import_folder">Importer un dossier</string>
+    <string name="rescan_folders">Réanalyser les dossiers</string>
+    <string name="import_progress">Importation %1$d / %2$d…</string>
+    <string name="import_nothing_new">Aucun nouveau titre</string>
+    <string name="import_folder_failed">Impossible de lire ce dossier</string>
     <plurals name="import_done">
         <item quantity="one">%d titre importé</item>
         <item quantity="many">%d titres importés</item>
@@ -54,6 +59,9 @@
     </plurals>
     <string name="unknown_artist">Artiste inconnu</string>
     <string name="search">Rechercher</string>
+    <string name="tab_library">Liste de lecture</string>
+    <string name="mini_player_idle">Touchez un titre pour le lire</string>
+    <string name="more_actions">Plus</string>
     <string name="cancel">Annuler</string>
     <string name="done">OK</string>
     <string name="save">Enregistrer</string>
@@ -115,6 +123,10 @@
     <string name="cloud_not_connected">Non connecté</string>
     <string name="settings_language">Langue</string>
     <string name="settings_appearance">Apparence</string>
+    <string name="settings_folders">Dossiers locaux</string>
+    <string name="settings_folders_footer">Les titres ajoutés à un dossier sont importés à l\'ouverture de l\'app. Retirer un dossier retire ses titres de la bibliothèque ; les fichiers audio sont conservés.</string>
+    <string name="settings_folders_empty">Aucun dossier importé</string>
+    <string name="folder_remove_title">Retirer ce dossier ?</string>
     <string name="appearance_system">Comme le système</string>
     <string name="focus_background">Arrière-plan</string>
     <string name="focus_flowing_background">Arrière-plan fluide</string>

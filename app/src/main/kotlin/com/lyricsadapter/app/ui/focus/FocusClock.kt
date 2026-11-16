@@ -19,6 +19,12 @@ private const val RESYNC_MS = 250.0
 /** Share of the remaining difference from the player taken up each frame. */
 private const val SLEW = 0.05
 
+/**
+ * How much faster or slower than real time the clock may run while it takes
+ * up a difference, so a correction never shows as the lyrics slowing down.
+ */
+private const val MAX_RATE_CHANGE = 0.1
+
 /** The playback position that focus mode draws with, once per frame. */
 @Stable
 internal class FocusClock {
@@ -31,13 +37,15 @@ internal class FocusClock {
  * controller's position is an estimate that steps back by 100-150 ms when a
  * fresh report arrives from the player; drawn as is, finished words go dark
  * and light again. While playing, this clock advances with frame time, eases
- * toward the controller's position and never goes backwards; it only jumps
- * for a difference of [RESYNC_MS] or more. Paused, it shows the player's
- * position as is.
+ * toward the controller's position, at most [MAX_RATE_CHANGE] faster or
+ * slower than real time, and never goes backwards; it only jumps for a
+ * difference of [RESYNC_MS] or more. Paused, it shows the player's position
+ * as is.
  */
 @Composable
 internal fun rememberFocusClock(player: PlayerConnection, isPlaying: Boolean, trackId: String): FocusClock {
-    val clock = remember { FocusClock() }
+    // Starts where the player is, so the first frame already shows the lines being sung.
+    val clock = remember { FocusClock().apply { positionMs = player.positionMs() } }
     val playing by rememberUpdatedState(isPlaying)
     LaunchedEffect(trackId) {
         var position = player.positionMs().toDouble()
@@ -46,12 +54,14 @@ internal fun rememberFocusClock(player: PlayerConnection, isPlaying: Boolean, tr
         while (true) {
             withFrameNanos { now ->
                 val reported = player.positionMs().toDouble()
-                val predicted = position + (now - lastFrame) / 1e6
+                val elapsed = (now - lastFrame) / 1e6
+                val predicted = position + elapsed
                 lastFrame = now
                 val error = reported - predicted
+                val limit = elapsed * MAX_RATE_CHANGE
                 position = when {
                     !playing || abs(error) >= RESYNC_MS -> reported
-                    else -> maxOf(position, predicted + error * SLEW)
+                    else -> maxOf(position, predicted + (error * SLEW).coerceIn(-limit, limit))
                 }
                 clock.positionMs = position.roundToLong()
             }

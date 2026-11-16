@@ -13,7 +13,7 @@
     <string name="empty_local">Importiere die MP3- und FLAC-Dateien auf deinem Telefon</string>
     <string name="empty_cloud">Verbinde WebDAV, dann erscheint hier deine Cloud-Mediathek</string>
     <string name="empty_online">Online-Titel, die du über die Suche abspielst oder hinzufügst, erscheinen hier</string>
-    <string name="empty_playlist">Melde dich bei einer Musikquelle an, um ihre Playlists über die Suche zu öffnen</string>
+    <string name="empty_playlist">Melde dich bei einer Musikquelle an und öffne ihre Playlists über das Menü am Titel</string>
     <string name="open_settings">Einstellungen öffnen</string>
     <string name="empty_no_sources">Installiere ein Musikquellen-Plugin, um Online-Musik zu suchen und abzuspielen</string>
     <string name="open_plugins">Plugins verwalten</string>
@@ -23,6 +23,11 @@
     <string name="cloud_refresh">Cloud-Mediathek aktualisieren</string>
     <string name="retry">Erneut versuchen</string>
     <string name="import_files">Importieren</string>
+    <string name="import_folder">Ordner importieren</string>
+    <string name="rescan_folders">Ordner erneut durchsuchen</string>
+    <string name="import_progress">Importiere %1$d / %2$d …</string>
+    <string name="import_nothing_new">Keine neuen Titel</string>
+    <string name="import_folder_failed">Dieser Ordner kann nicht gelesen werden</string>
     <plurals name="import_done">
         <item quantity="one">%d Titel importiert</item>
         <item quantity="other">%d Titel importiert</item>
@@ -49,6 +54,9 @@
     </plurals>
     <string name="unknown_artist">Unbekannter Künstler</string>
     <string name="search">Suchen</string>
+    <string name="tab_library">Playlist</string>
+    <string name="mini_player_idle">Tippe auf einen Titel, um ihn abzuspielen</string>
+    <string name="more_actions">Mehr</string>
     <string name="cancel">Abbrechen</string>
     <string name="done">Fertig</string>
     <string name="save">Speichern</string>
@@ -110,6 +118,10 @@
     <string name="cloud_not_connected">Nicht verbunden</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_appearance">Darstellung</string>
+    <string name="settings_folders">Lokale Ordner</string>
+    <string name="settings_folders_footer">Neue Titel in einem Ordner werden beim Öffnen der App importiert. Wird ein Ordner entfernt, verschwinden seine Titel aus der Mediathek; die Audiodateien bleiben erhalten.</string>
+    <string name="settings_folders_empty">Noch keine Ordner importiert</string>
+    <string name="folder_remove_title">Diesen Ordner entfernen?</string>
     <string name="appearance_system">Wie System</string>
     <string name="focus_background">Hintergrund</string>
     <string name="focus_flowing_background">Fließender Hintergrund</string>

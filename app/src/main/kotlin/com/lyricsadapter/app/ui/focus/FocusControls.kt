@@ -41,10 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -80,6 +77,9 @@ private val SIDE_MARGIN = 20.dp
 private val ROW_GAP = 12.dp
 private val PROGRESS_ROW = 62.dp
 private val VOLUME_ROW = 44.dp
+
+/** While the controls are hidden, touches from the transport row down reveal them; the progress row is left to the lyrics. */
+internal val FOCUS_CONTROLS_WAKE_TOP = PROGRESS_ROW + ROW_GAP
 private val HIT_SIZE = 44.dp
 
 private val TRACK_COLOR = Color.White.copy(alpha = 0.24f)
@@ -133,14 +133,14 @@ internal fun FocusControls(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconControl(R.drawable.tp_backward, stringResource(R.string.action_previous), 42.dp, onClick = onPrevious)
+            IconControl(R.drawable.ms_fast_rewind, stringResource(R.string.action_previous), 42.dp, onClick = onPrevious)
             IconControl(
-                icon = if (isPlaying) R.drawable.tp_pause else R.drawable.tp_play,
+                icon = if (isPlaying) R.drawable.ms_pause else R.drawable.ms_play_arrow,
                 label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
                 glyph = 58.dp,
                 onClick = onTogglePlay,
             )
-            IconControl(R.drawable.tp_forward, stringResource(R.string.action_next), 42.dp, onClick = onNext)
+            IconControl(R.drawable.ms_fast_forward, stringResource(R.string.action_next), 42.dp, onClick = onNext)
         }
         VolumeRow(volume, mode, translation, onVolumeChange, onToggleMute, onCyclePlaybackMode, onToggleTranslation, Modifier.height(VOLUME_ROW))
     }
@@ -187,7 +187,7 @@ private fun VolumeRow(
         if (translatable) TranslateButton(translation, onToggleTranslation)
         val muted = volume == 0f
         IconControl(
-            icon = if (muted) R.drawable.tp_volume_off else R.drawable.tp_volume_down,
+            icon = if (muted) R.drawable.ms_volume_off else R.drawable.ms_volume_down,
             label = stringResource(if (muted) R.string.action_unmute else R.string.action_mute),
             glyph = 22.dp,
             onClick = onToggleMute,
@@ -202,13 +202,13 @@ private fun VolumeRow(
         )
         // With the translate button on the left, the speaker takes a button's width so the slider stays centred.
         Box(if (translatable) Modifier.size(HIT_SIZE) else Modifier, contentAlignment = Alignment.Center) {
-            Glyph(R.drawable.tp_volume_up, 24.dp, Color.White)
+            Glyph(R.drawable.ms_volume_up, 24.dp, Color.White)
         }
         IconControl(
             icon = when (mode) {
-                PlaybackMode.Order -> R.drawable.tp_repeat
-                PlaybackMode.Shuffle -> R.drawable.tp_shuffle
-                PlaybackMode.RepeatOne -> R.drawable.tp_repeat_one
+                PlaybackMode.Order -> R.drawable.ms_repeat
+                PlaybackMode.Shuffle -> R.drawable.ms_shuffle
+                PlaybackMode.RepeatOne -> R.drawable.ms_repeat_one
             },
             label = stringResource(
                 when (mode) {
@@ -243,7 +243,7 @@ private fun TranslateButton(status: TranslationStatus, onToggle: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         if (busy) Spinner(18.dp, TRANSLATE_COLOR)
-        else Glyph(R.drawable.tp_translate, 22.dp, if (status == TranslationStatus.Translated) TRANSLATED_COLOR else TRANSLATE_COLOR)
+        else Glyph(R.drawable.ms_translate, 18.dp, if (status == TranslationStatus.Translated) TRANSLATED_COLOR else TRANSLATE_COLOR)
     }
 }
 
@@ -342,21 +342,19 @@ private fun Glyph(icon: Int, size: Dp, tint: Color) {
     Image(painterResource(icon), contentDescription = null, colorFilter = ColorFilter.tint(tint), modifier = Modifier.size(size))
 }
 
+/** Desktop's busy glyph: `progress_activity` turning once a second (Tailwind's `animate-spin`). */
 @Composable
 private fun Spinner(size: Dp, color: Color) {
     val turn by rememberInfiniteTransition(label = "spinner").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart),
         label = "turn",
     )
-    Box(
-        Modifier.size(size).drawBehind {
-            val stroke = 2.dp.toPx()
-            rotate(turn) {
-                drawArc(color, 0f, 270f, useCenter = false, topLeft = Offset(stroke / 2, stroke / 2),
-                    size = Size(this.size.width - stroke, this.size.height - stroke), style = Stroke(stroke, cap = StrokeCap.Round))
-            }
-        },
+    Image(
+        painterResource(R.drawable.ms_progress_activity),
+        contentDescription = null,
+        colorFilter = ColorFilter.tint(color),
+        modifier = Modifier.size(size).graphicsLayer { rotationZ = turn },
     )
 }

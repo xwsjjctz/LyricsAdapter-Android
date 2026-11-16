@@ -26,11 +26,11 @@ STRINGS = {
         "Les titres en ligne lus ou ajoutés depuis la recherche apparaissent ici",
     ],
     "empty_playlist": [
-        "Sign in to a music source to open its playlists from search",
-        "音楽ソースにログインすると、検索からプレイリストを開けます",
-        "음악 소스에 로그인하면 검색에서 플레이리스트를 열 수 있습니다",
-        "Melde dich bei einer Musikquelle an, um ihre Playlists über die Suche zu öffnen",
-        "Connectez-vous à une source musicale pour ouvrir ses playlists depuis la recherche",
+        "Sign in to a music source, then open its playlists from the menu under the title",
+        "音楽ソースにログインしたら、タイトルのメニューからプレイリストを開けます",
+        "음악 소스에 로그인한 뒤 제목의 메뉴에서 플레이리스트를 열 수 있습니다",
+        "Melde dich bei einer Musikquelle an und öffne ihre Playlists über das Menü am Titel",
+        "Connectez-vous à une source musicale, puis ouvrez ses playlists depuis le menu du titre",
     ],
     "empty_no_sources": [
         "Install a music source plugin to search and play online music",
@@ -58,6 +58,9 @@ STRINGS = {
     "retry": ["Retry", "再試行", "다시 시도", "Erneut versuchen", "Réessayer"],
     "select_none": ["Select None", "選択解除", "선택 해제", "Keine auswählen", "Tout désélectionner"],
     "search": ["Search", "検索", "검색", "Suchen", "Rechercher"],
+    "tab_library": ["Playlist", "プレイリスト", "재생 목록", "Playlist", "Liste de lecture"],
+    "mini_player_idle": ["Tap a song to start playing", "曲をタップして再生", "곡을 탭하여 재생", "Tippe auf einen Titel, um ihn abzuspielen", "Touchez un titre pour le lire"],
+    "more_actions": ["More", "その他", "더 보기", "Mehr", "Plus"],
     "remove": ["Remove", "削除", "제거", "Entfernen", "Retirer"],
     "edit_no_write_access": [
         "No permission to write this file. Import the song again, then edit it.",
@@ -218,6 +221,39 @@ STRINGS = {
         "Der fließende Hintergrund braucht Android 13 oder neuer.", "Le fond animé nécessite Android 13 ou une version ultérieure.",
     ],
     "track_download": ["Download", "ダウンロード", "다운로드", "Herunterladen", "Télécharger"],
+    "import_folder": ["Import Folder", "フォルダを読み込む", "폴더 가져오기", "Ordner importieren", "Importer un dossier"],
+    "rescan_folders": ["Rescan Folders", "フォルダを再スキャン", "폴더 다시 검색", "Ordner erneut durchsuchen", "Réanalyser les dossiers"],
+    "import_progress": [
+        "Importing %1$d / %2$d…",
+        "読み込み中 %1$d / %2$d…",
+        "가져오는 중 %1$d / %2$d…",
+        "Importiere %1$d / %2$d …",
+        "Importation %1$d / %2$d…",
+    ],
+    "import_nothing_new": ["No new songs", "新しい曲はありません", "새로운 곡이 없습니다", "Keine neuen Titel", "Aucun nouveau titre"],
+    "import_folder_failed": [
+        "This folder can't be read",
+        "このフォルダを読み込めません",
+        "이 폴더를 읽을 수 없습니다",
+        "Dieser Ordner kann nicht gelesen werden",
+        "Impossible de lire ce dossier",
+    ],
+    "settings_folders": ["Local Folders", "ローカルフォルダ", "로컬 폴더", "Lokale Ordner", "Dossiers locaux"],
+    "settings_folders_footer": [
+        "Songs added to a folder are imported when the app opens. Removing a folder takes its songs out of the library; the audio files are kept.",
+        "フォルダに追加された曲は、アプリを開いたときに自動で読み込まれます。フォルダを削除するとその曲はライブラリから外れますが、音声ファイルは残ります。",
+        "폴더에 추가된 곡은 앱을 열 때 자동으로 가져옵니다. 폴더를 제거하면 그 안의 곡이 보관함에서 빠지며, 오디오 파일은 그대로 남습니다.",
+        "Neue Titel in einem Ordner werden beim Öffnen der App importiert. Wird ein Ordner entfernt, verschwinden seine Titel aus der Mediathek; die Audiodateien bleiben erhalten.",
+        "Les titres ajoutés à un dossier sont importés à l'ouverture de l'app. Retirer un dossier retire ses titres de la bibliothèque ; les fichiers audio sont conservés.",
+    ],
+    "settings_folders_empty": [
+        "No folders imported yet",
+        "まだフォルダを読み込んでいません",
+        "아직 가져온 폴더가 없습니다",
+        "Noch keine Ordner importiert",
+        "Aucun dossier importé",
+    ],
+    "folder_remove_title": ["Remove this folder?", "このフォルダを削除しますか？", "이 폴더를 제거할까요?", "Diesen Ordner entfernen?", "Retirer ce dossier ?"],
 }
 
 PLURALS = {

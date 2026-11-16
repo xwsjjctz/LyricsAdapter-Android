@@ -14,16 +14,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** How long the controls stay after the last touch (desktop's `FOCUS_CONTROLS_IDLE_MS`). */
-private const val IDLE_MS = 1_000L
+/**
+ * How long the controls stay after the last touch. Desktop's
+ * `FOCUS_CONTROLS_IDLE_MS` is a second; three at the owner's request
+ * (2026-10-30), which a second felt too short for on a phone.
+ */
+private const val IDLE_MS = 3_000L
 
 private const val TOUCH = "touch"
 
 /**
  * Desktop's portrait `FocusControlsIdle`: the controls start hidden, appear
- * while something holds them (a finger on them, or the lyrics being scrolled
- * by hand) and hide again a second after the last hold ends. Playback never
- * counts as activity.
+ * while something holds them (a finger on them, or on the lyrics dragging
+ * them) and hide again [IDLE_MS] after the last hold ends. Playback, a track
+ * change included, never counts as activity and never cuts a hold short.
  */
 @Stable
 internal class FocusControlsIdle(private val scope: CoroutineScope) {

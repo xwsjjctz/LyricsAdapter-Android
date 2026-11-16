@@ -6,24 +6,32 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsContext
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.CompositingStrategy
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
-import kotlin.math.ceil
+import com.lyricsadapter.lyrics.Emphasis
+import com.lyricsadapter.lyrics.FLOAT_EM
+import com.lyricsadapter.lyrics.LineMotion
 import com.lyricsadapter.lyrics.LyricLine
-import kotlin.math.PI
-import kotlin.math.sin
+import com.lyricsadapter.lyrics.Sweep
+import com.lyricsadapter.lyrics.WORD_FADE_WIDTH
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /*
  * Desktop's alphas, as its focus mode renders them: text is white at 0.96;
@@ -33,125 +41,323 @@ import kotlin.math.sin
  */
 private const val TEXT_ALPHA = 0.96f
 private const val SUNG_LINE_ALPHA = 0.85f
+private const val UPCOMING_SHARE = 0.4f
 internal val INACTIVE = Color.White.copy(alpha = TEXT_ALPHA * 0.2f)
 private val SUNG = Color.White.copy(alpha = TEXT_ALPHA * SUNG_LINE_ALPHA)
-private val UPCOMING = Color.White.copy(alpha = TEXT_ALPHA * SUNG_LINE_ALPHA * 0.4f)
+private val UPCOMING = Color.White.copy(alpha = TEXT_ALPHA * SUNG_LINE_ALPHA * UPCOMING_SHARE)
 private val WHOLE_LINE = SUNG
 
-/** How far a sung word rises. */
-private val LIFT = 3.dp
-private val GLOW_RADIUS = 14.dp
-private const val GLOW_STRENGTH = 0.75f
+/** Glows fainter than this are not drawn. */
+private const val MIN_GLOW = 0.004f
 
-/** Half the width of the fill's soft edge, in ems; narrower than one CJK character, so it reads as a fill. */
-private const val SWEEP_SOFTNESS = 0.25f
+/** Keys of the held letters' glow layers, below every letter's own key. */
+private const val GLOW_KEYS = -1_000_000
 
-/** Held words this long glow while they are sung, as long as they are short. */
-private const val GLOW_MIN_MS = 1_000L
-private const val GLOW_MAX_CHARS = 8
+/** Room around a moving word's glyphs in its layer, and around a held letter's for its glow, in ems. */
+private const val WORD_MARGIN = 0.25f
+private const val LETTER_MARGIN = 0.7f
 
 /**
- * Draws one line while it is or was being sung. Sung words are lit and lifted
- * a little; the word being sung fills from the left with a soft edge and rises
- * as it fills; words not reached yet stay dim and at rest. [emphasis] fades all
- * of it in when the line starts and back out when the line is left. A long
- * held word also glows: the word is drawn white once into [glowLayer] with a
- * real blur, and only the layer's opacity follows the word, so the glow
- * neither depends on text-shadow support nor is cut at the word's box. Clip
- * paths are cached per text range.
+ * The glow is brighter and wider than desktop's at the owner's request
+ * (2026-10-29): desktop's reads as too faint on a phone.
+ */
+private const val GLOW_GAIN = 2f
+private const val GLOW_WIDENING = 1.5f
+
+/**
+ * Draws one line while it is or was being sung, moving its words as AMLL
+ * does on desktop ([LineMotion]): each word floats up as it starts and the
+ * fill runs across the words with a soft edge; held words swell, spread, bob
+ * and glow letter by letter. Once the line is left the words float back
+ * down. [draw] returns false while the line is at rest, to be drawn plainly.
+ *
+ * Words that have settled are drawn in one go, and so are words not reached
+ * yet; only the words still moving are drawn one by one. Clip shapes and
+ * word widths are worked out once per layout.
+ *
+ * Text drawn under a plain translation lands on whole pixels, so a rise of a
+ * few pixels would move in steps. Each moving word and held letter is drawn
+ * into its own offscreen layer instead, as desktop's browser composites each
+ * `will-change: transform` word, and the layer is moved by fractions of a
+ * pixel; it is redrawn only when its fill changes. A glowing letter's glow
+ * is a blurred copy in a layer of its own, whose opacity follows the glow.
+ * [release] frees the layers.
  */
 internal class SungLinePainter(
     private val line: LyricLine,
-    private val measurer: TextMeasurer,
     private val style: TextStyle,
-    private val glowLayer: GraphicsLayer,
     /** Where each index of [line]'s text sits in the laid-out text, which may hold word joiners. */
     private val offsets: IntArray,
+    private val graphics: GraphicsContext,
 ) {
-    private val words = line.words
-    private val wordEnds: IntArray = words.runningFold(0) { end, word -> end + word.text.length }.drop(1).toIntArray()
-    private val wordTimed = words.isNotEmpty() && wordEnds.last() == line.text.length
-    private var layout: TextLayoutResult? = null
-    private val paths = HashMap<Long, Pair<Path, Rect>>()
+    private val wordTimed = line.words.isNotEmpty() && line.words.sumOf { it.text.length } == line.text.length
 
-    /** The word now drawn in [glowLayer], or -1. */
-    private var glowWord = -1
+    /**
+     * The line's word timing. It is worked out when the line is first sung:
+     * most lines are never reached while focus mode shows, and working all
+     * of them out up front delayed its opening.
+     */
+    private val timing by lazy(LazyThreadSafetyMode.NONE) { Timing(line) }
+    private val atoms get() = timing.motion.atoms
+    private val drawn get() = timing.motion.words
+    private val held get() = timing.held
+    private val emphasisEndsAtMs get() = timing.emphasisEndsAtMs
+
+    private class Timing(line: LyricLine) {
+        val motion = LineMotion(line)
+
+        /** For each drawn word, its emphasis and which of that emphasis's letters it holds. */
+        val held: List<Pair<Emphasis, List<Int>>?> = motion.words.map { atomIndex ->
+            val atom = motion.atoms[atomIndex]
+            motion.emphases.firstNotNullOfOrNull { emphasis ->
+                val letters = emphasis.letters.indices.filter { emphasis.letters[it].first >= atom.start && emphasis.letters[it].last < atom.end }
+                if (letters.isEmpty()) null else emphasis to letters
+            }
+        }
+        val emphasisEndsAtMs = motion.emphases.maxOfOrNull { it.endMs } ?: 0.0
+    }
+
+    private var layout: TextLayoutResult? = null
+    private var placed: Placed? = null
+    private val ranges = HashMap<Long, TextRange>()
+    
+    /** Layers of the moving words (keyed by their first index), held letters (by it negated) and their glows. */
+    private val layers = HashMap<Int, Slot>()
+
+    private class Slot(val layer: GraphicsLayer) {
+        /** What the layer was last drawn with, to redraw it only when that changes. */
+        var content = Long.MIN_VALUE
+        var used = false
+    }
+
+    /** Where the drawn words sit in the layout, and the fill across them. */
+    private class Placed(val left: FloatArray, val width: FloatArray, val sweep: Sweep)
 
     fun onLayout(result: TextLayoutResult) {
         layout = result
-        paths.clear()
-        glowWord = -1
+        ranges.clear()
+        placed = null
     }
 
-    fun draw(scope: DrawScope, positionMs: Long, emphasis: Float) = with(scope) {
-        val layout = layout ?: return
+    /** Where the words sit in [result], worked out when the line is first drawn sung. */
+    private fun place(result: TextLayoutResult): Placed {
+        val left = FloatArray(drawn.size)
+        val width = FloatArray(drawn.size)
+        drawn.forEachIndexed { index, atomIndex ->
+            val atom = atoms[atomIndex]
+            left[index] = result.getBoundingBox(offsets[atom.start]).left
+            width[index] = result.getBoundingBox(offsets[atom.end - 1]).right - left[index]
+        }
+        return Placed(left, width, Sweep(timing.motion, width, result.lineHeightPx() * WORD_FADE_WIDTH))
+    }
+
+    private fun TextLayoutResult.lineHeightPx(): Float = if (lineCount > 1) getLineBaseline(1) - getLineBaseline(0) else size.height.toFloat()
+
+    /**
+     * Draws the line at [positionMs]; [emphasis] fades the colours in while it
+     * is sung and out once it is left at [leftAtMs]. Returns false when the
+     * line is at rest and should be drawn as plain text instead.
+     */
+    fun draw(scope: DrawScope, positionMs: Long, emphasis: Float, leftAtMs: Long?): Boolean = with(scope) {
+        val layout = layout ?: return false
         if (!wordTimed) {
+            if (emphasis <= 0f) return false
             drawText(layout, color = lerp(INACTIVE, WHOLE_LINE, emphasis))
-            return
+            return true
         }
-        val sung = lerp(INACTIVE, SUNG, emphasis)
-        val upcoming = lerp(INACTIVE, UPCOMING, emphasis)
-        val finished = words.indexOfFirst { it.endMs > positionMs }.let { if (it < 0) words.size else it }
-        val lift = LIFT.toPx() * emphasis
-        if (finished > 0) {
-            translate(top = -lift) { clipPath(range(0, wordEnds[finished - 1]).first) { drawText(layout, color = sung) } }
-        }
-        val current = words.getOrNull(finished)
-        val singing = current != null && positionMs >= current.startMs
-        val restFrom = if (singing) finished + 1 else finished
-        if (restFrom < words.size) {
-            clipPath(range(startOf(restFrom), line.text.length).first) { drawText(layout, color = upcoming) }
-        }
-        if (current != null && singing) drawSinging(layout, finished, positionMs, emphasis, sung, upcoming)
-    }
-
-    private fun DrawScope.drawSinging(layout: TextLayoutResult, index: Int, positionMs: Long, emphasis: Float, sung: Color, upcoming: Color) {
-        val word = words[index]
-        val progress = ((positionMs - word.startMs).toFloat() / word.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f)
-        val (path, bounds) = range(startOf(index), wordEnds[index])
-        val rise = 1f - (1f - progress) * (1f - progress) * (1f - progress)
-        val feather = style.fontSize.toPx() * SWEEP_SOFTNESS
-        val edge = bounds.left - feather + (bounds.width + 2 * feather) * progress
-        val sweep = Brush.horizontalGradient(0f to sung, 1f to upcoming, startX = edge - feather, endX = edge + feather)
-        translate(top = -LIFT.toPx() * emphasis * rise) {
-            val glow = if (glows(word.durationMs, word.text)) sin(PI.toFloat() * progress) * emphasis else 0f
-            if (glow > 0.01f && Build.VERSION.SDK_INT >= 31) drawGlow(layout, index, bounds, glow)
-            // Without an explicit alpha the paint keeps the last colour's, and the gradient is dimmed twice.
-            clipPath(path) { drawText(layout, brush = sweep, alpha = 1f) }
-        }
-    }
-
-    private fun DrawScope.drawGlow(layout: TextLayoutResult, index: Int, bounds: Rect, glow: Float) {
-        val radius = GLOW_RADIUS.toPx()
-        // Room for the blur to fade out before the layer's edge.
-        val margin = ceil(radius * 3).toInt()
-        if (glowWord != index) {
-            val alone = measurer.measure(words[index].text, style, softWrap = false, maxLines = 1)
-            glowLayer.record(IntSize(alone.size.width + 2 * margin, alone.size.height + 2 * margin)) {
-                drawText(alone, color = Color.White, topLeft = Offset(margin.toFloat(), margin.toFloat()))
+        // Not reached yet: nothing of the line's timing is needed.
+        if (emphasis <= 0f && leftAtMs == null) return false
+        val motion = timing.motion
+        // Left long enough ago that every word has come back to rest.
+        if (emphasis <= 0f && leftAtMs != null && positionMs >= maxOf(motion.restsAtMs(leftAtMs), emphasisEndsAtMs)) return false
+        val placed = placed ?: place(layout).also { placed = it }
+        val colors = Colors(lerp(INACTIVE, SUNG, emphasis), lerp(INACTIVE, UPCOMING, emphasis))
+        val em = style.fontSize.toPx()
+        // Whole pixels, so a word that has floated up lands where the settled words are drawn.
+        val lift = (FLOAT_EM * em).roundToInt().toFloat()
+        val fade = placed.sweep.width
+        val states = IntArray(drawn.size) { index ->
+            val atomIndex = drawn[index]
+            val float = motion.float(atomIndex, positionMs, leftAtMs)
+            val edge = placed.sweep.edge(index, positionMs)
+            val still = held[index]?.first?.let { positionMs < it.movesFromMs || positionMs >= it.endMs } ?: true
+            when {
+                still && leftAtMs == null && float >= 1f && edge - fade / 2 >= placed.width[index] -> SETTLED
+                still && float <= 0f && edge + fade / 2 <= 0f -> WAITING
+                else -> MOVING
             }
-            glowLayer.renderEffect = BlurEffect(radius, radius, TileMode.Decal)
-            glowWord = index
         }
-        glowLayer.alpha = GLOW_STRENGTH * glow
-        val top = layout.getLineTop(layout.getLineForOffset(offsets[startOf(index)]))
-        translate(left = bounds.left - margin, top = top - margin) { drawLayer(glowLayer) }
+        val settled = states.indexOfFirst { it != SETTLED }.let { if (it < 0) drawn.size else it }
+        val waiting = states.indexOfLast { it != WAITING } + 1
+
+        if (settled > 0) {
+            translate(top = -lift) { clip(range(0, atoms[drawn[settled - 1]].end)) { drawText(layout, color = colors.sung) } }
+        }
+        if (waiting < drawn.size) clip(range(atoms[drawn[waiting]].start, line.text.length)) { drawText(layout, color = colors.upcoming) }
+        for (index in settled until waiting) drawWord(layout, motion, placed, index, positionMs, leftAtMs, emphasis, em, lift, colors)
+        releaseUnused()
+        return true
     }
 
-    private fun glows(durationMs: Long, text: String): Boolean = durationMs >= GLOW_MIN_MS && text.trim().length in 1..GLOW_MAX_CHARS
+    /** Frees every layer; the painter makes new ones if it draws again. */
+    fun release() {
+        layers.values.forEach { graphics.releaseGraphicsLayer(it.layer) }
+        layers.clear()
+    }
 
-    private fun startOf(index: Int): Int = if (index == 0) 0 else wordEnds[index - 1]
+    private fun slot(key: Int): Slot = layers.getOrPut(key) {
+        Slot(graphics.createGraphicsLayer().apply { compositingStrategy = CompositingStrategy.Offscreen })
+    }.also { it.used = true }
 
-    private fun range(start: Int, end: Int): Pair<Path, Rect> = paths.getOrPut(start.toLong() shl 32 or end.toLong()) {
-        val path = Path()
-        rangeRects(layout!!, offsets[start], offsets[end], OVERHANG).forEach(path::addRect)
-        // The sweep and glow follow the glyphs, not the widened clip.
-        val bounds = rangeRects(layout!!, offsets[start], offsets[end], overhang = 0f).reduce { union, rect ->
-            Rect(minOf(union.left, rect.left), minOf(union.top, rect.top), maxOf(union.right, rect.right), maxOf(union.bottom, rect.bottom))
+    private fun releaseUnused() {
+        val iterator = layers.values.iterator()
+        while (iterator.hasNext()) {
+            val slot = iterator.next()
+            if (slot.used) {
+                slot.used = false
+            } else {
+                graphics.releaseGraphicsLayer(slot.layer)
+                iterator.remove()
+            }
         }
-        path to bounds
+    }
+
+    private class Colors(val sung: Color, val upcoming: Color)
+
+    private fun DrawScope.drawWord(
+        layout: TextLayoutResult,
+        motion: LineMotion,
+        placed: Placed,
+        index: Int,
+        positionMs: Long,
+        leftAtMs: Long?,
+        emphasis: Float,
+        em: Float,
+        lift: Float,
+        colors: Colors,
+    ) {
+        val atom = atoms[drawn[index]]
+        val fade = placed.sweep.width
+        // The soft edge in the line's coordinates: lit behind it, dim ahead.
+        val edgeAt = placed.left[index] + placed.sweep.edge(index, positionMs)
+        fun brush(shift: Float): Brush = when {
+            edgeAt - fade / 2 >= placed.left[index] + placed.width[index] -> SolidColor(colors.sung)
+            edgeAt + fade / 2 <= placed.left[index] -> SolidColor(colors.upcoming)
+            else -> Brush.horizontalGradient(0f to colors.sung, 1f to colors.upcoming, startX = edgeAt - fade / 2 - shift, endX = edgeAt + fade / 2 - shift)
+        }
+        val edgeKey = when {
+            edgeAt - fade / 2 >= placed.left[index] + placed.width[index] -> 1L
+            edgeAt + fade / 2 <= placed.left[index] -> 2L
+            else -> (edgeAt * 4).roundToInt().toLong() shl 2
+        }
+        val colorKey = colors.sung.value.toLong() * 31 + colors.upcoming.value.toLong()
+        val lineIndex = layout.getLineForOffset(offsets[atom.start])
+        translate(top = -lift * motion.float(drawn[index], positionMs, leftAtMs)) {
+            val letters = held[index]
+            if (letters == null) {
+                val margin = em * WORD_MARGIN
+                val bounds = pixelBounds(
+                    placed.left[index] - margin, layout.getLineTop(lineIndex) - margin,
+                    placed.left[index] + placed.width[index] + margin, layout.getLineBottom(lineIndex) + margin,
+                )
+                val slot = slot(atom.start)
+                val content = edgeKey * 31 + colorKey
+                if (slot.content != content || slot.layer.size != bounds.size) {
+                    slot.content = content
+                    slot.layer.record(bounds.size) {
+                        translate(-bounds.offset.x.toFloat(), -bounds.offset.y.toFloat()) {
+                            // Without an explicit alpha the paint keeps the last colour's, and the gradient is dimmed twice.
+                            clip(range(atom.start, atom.end)) { drawText(layout, brush = brush(0f), alpha = 1f) }
+                        }
+                    }
+                }
+                slot.layer.topLeft = bounds.offset
+                drawLayer(slot.layer)
+            } else {
+                val (word, own) = letters
+                val margin = em * LETTER_MARGIN
+                for (letter in own) {
+                    val range = word.letters[letter]
+                    val box = layout.getBoundingBox(offsets[range.first])
+                    val bounds = pixelBounds(box.left - margin, layout.getLineTop(lineIndex) - margin, box.right + margin, layout.getLineBottom(lineIndex) + margin)
+                    val origin = Offset(bounds.offset.x.toFloat(), bounds.offset.y.toFloat())
+                    val cell = range(range.first, range.last + 1)
+                    val scale = word.scale(letter, positionMs)
+                    fun GraphicsLayer.place() {
+                        topLeft = bounds.offset
+                        pivotOffset = box.center - origin
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = word.spreadEm(letter, positionMs) * em * scale
+                        translationY = -word.riseEm(letter, positionMs) * em * scale
+                    }
+                    // Desktop's mask dims the glow ahead of the fill as it dims the text.
+                    val lit = ((edgeAt + fade / 2 - box.center.x) / fade).coerceIn(0f, 1f)
+                    val glow = (GLOW_GAIN * word.glowAlpha(letter, positionMs) * SUNG_LINE_ALPHA * emphasis * (UPCOMING_SHARE + (1 - UPCOMING_SHARE) * lit)).coerceAtMost(1f)
+                    if (glow >= MIN_GLOW && Build.VERSION.SDK_INT >= 31) {
+                        // Desktop's text-shadow: the letter in white, blurred, under the letter. Drawn once
+                        // into its own layer; only the layer's opacity follows the glow.
+                        val radius = cssShadowRadius(GLOW_WIDENING * word.glowRadiusEm * em)
+                        val glowSlot = slot(GLOW_KEYS - range.first)
+                        val content = radius.toRawBits().toLong()
+                        if (glowSlot.content != content || glowSlot.layer.size != bounds.size) {
+                            glowSlot.content = content
+                            glowSlot.layer.record(bounds.size) {
+                                translate(-origin.x, -origin.y) { clip(cell) { drawText(layout, color = Color.White) } }
+                            }
+                            glowSlot.layer.renderEffect = BlurEffect(radius, radius, TileMode.Decal)
+                        }
+                        glowSlot.layer.alpha = glow
+                        glowSlot.layer.place()
+                        drawLayer(glowSlot.layer)
+                    }
+                    val slot = slot(-1 - range.first)
+                    val content = edgeKey * 31 + colorKey
+                    if (slot.content != content || slot.layer.size != bounds.size) {
+                        slot.content = content
+                        slot.layer.record(bounds.size) {
+                            // Cut from the line's layout, so the letter is drawn exactly as the line draws it at
+                            // rest: laid out alone, it would lose its kerning and ligatures and jump when the
+                            // word starts and stops moving.
+                            translate(-origin.x, -origin.y) { clip(cell) { drawText(layout, brush = brush(0f), alpha = 1f) } }
+                        }
+                    }
+                    slot.layer.place()
+                    drawLayer(slot.layer)
+                }
+            }
+        }
+    }
+
+    /** The whole-pixel box around a rectangle, so a layer's content sits where the text would be drawn directly. */
+    private class PixelBounds(val offset: IntOffset, val size: IntSize)
+
+    private fun pixelBounds(left: Float, top: Float, right: Float, bottom: Float): PixelBounds {
+        val x = floor(left).toInt()
+        val y = floor(top).toInt()
+        return PixelBounds(IntOffset(x, y), IntSize(ceil(right).toInt() - x, ceil(bottom).toInt() - y))
+    }
+
+    private fun range(start: Int, end: Int): TextRange = ranges.getOrPut(start.toLong() shl 32 or end.toLong()) {
+        val bands = rangeRects(layout!!, offsets[start], offsets[end], OVERHANG)
+        TextRange(bands, Path().apply { bands.forEach(::addRect) })
+    }
+
+    private class TextRange(val bands: List<Rect>, val path: Path)
+
+    /** Clips to [range]'s bands; a single band takes the cheaper rectangular clip. */
+    private inline fun DrawScope.clip(range: TextRange, block: DrawScope.() -> Unit) {
+        val band = range.bands.singleOrNull()
+        if (band != null) clipRect(band.left, band.top, band.right, band.bottom, block = block) else clipPath(range.path, block = block)
     }
 }
+
+private const val SETTLED = 0
+private const val WAITING = 1
+private const val MOVING = 2
+
+/** The blur radius that blurs as much as a CSS text-shadow of [cssRadius]: CSS blurs by half its radius. */
+private fun cssShadowRadius(cssRadius: Float): Float = cssBlurRadius(cssRadius / 2)
 
 /** Where one line's band ends, as a share of the way to the next baseline: below CJK and Latin descenders, above the next line's glyphs. */
 private const val BAND_SPLIT = 0.2f

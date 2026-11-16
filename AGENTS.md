@@ -6,7 +6,11 @@ and stays the reference for product behaviour and shared formats.
 
 ## Decisions in force
 
-Agreed with the owner on 2026-10-22. Change them only when the owner asks.
+Agreed with the owner on 2026-10-22 (the licence and AMLL port on 2026-10-29).
+Change them only when the owner asks.
+
+- The Android app is licensed AGPL-3.0-only (`LICENSE`), because its
+  focus-mode word animation is ported from AMLL, which is AGPL-3.0-only.
 
 - Native Kotlin with Jetpack Compose for UI and Media3 for playback. Playback,
   queues and the four library slots (local, cloud, online, playlist) live on the
@@ -23,7 +27,9 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
   `PluginLogger`. Do not add Kotlin Multiplatform targets until iOS work starts.
 - Releases are APKs on GitHub only; no Google Play.
 - Local music comes only from user imports through the Storage Access Framework
-  with persisted URI permissions. No MediaStore scanning, no media permissions.
+  with persisted URI permissions: files picked singly, or a folder (a document
+  tree), which the library then follows (`FolderScanner`, `FolderSync`). No
+  MediaStore scanning, no media permissions.
   The one exception is downloaded online songs: the app inserts them into
   MediaStore (`Music/LyricsAdapter`) itself, which needs no permission, and
   imports the returned URI.
@@ -38,11 +44,13 @@ Agreed with the owner on 2026-10-22. Change them only when the owner asks.
 | `plugin-host/` | Pure Kotlin plugin host: one QuickJS runtime per plugin, JS event loop, host bindings |
 | `plugin-host-spike/` | JVM command line against the live services (`smoke`, `qq-login`) |
 | `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
-| `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns |
-| `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output) and download file names |
+| `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns; `LineMotion` ports AMLL's word float, held-word emphasis and fill sweep, which desktop's focus mode runs, pinned in `LineMotionTest` against values measured on desktop over CDP |
+| `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output), download file names, and what following a folder adds and removes (`FolderSync`) |
 | `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
-| `app/` | The Android app: SAF import into Room, Media3 playback service, library wall and list, command palette, online downloads, settings and focus mode |
+| `app/` | The Android app: SAF import into Room, Media3 playback service, the playlist page (search pinned over the list) and settings under iOS 26 Apple Music style Liquid Glass controls (`ui/glass/` on Kyant0's Backdrop library: the mini player over a draggable tab bar, menus drawn in the page, one edge look for all glass in `GlassSurface.kt`, the header's scroll edge), last playback restored on start, online downloads and focus mode |
 | `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
+| `tools/icons/` | `generate.py` writes the `ui_*`/`ms_*` drawables from desktop's Material Symbols Rounded font (`node_modules/material-symbols`) at the axes desktop's CSS uses: FILL 0 opsz 24 by default, FILL 1 opsz 48 in focus mode |
+| `tools/ci/` | `check_page_size.py <apk>` fails unless every native library in the APK loads on 16 KB page devices; both workflows run it |
 | `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
 | `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
 
@@ -59,11 +67,25 @@ node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cas
 ./gradlew :app:installProfile                    # release code (R8) under the debug id and key, for measuring speed
 ./gradlew :app:assembleRelease                   # signed when keystore.properties exists at the root (never committed)
 python3 tools/i18n/generate.py                   # after changing values/strings.xml
+python3 tools/icons/generate.py ../LyricsAdapter # after adding an icon; needs fonttools and brotli
+python3 tools/startup/generate.py ../LyricsAdapter # the startup screen's artwork from desktop's; needs Pillow
 ./gradlew :spike-android:connectedDebugAndroidTest
 ```
 
 Plugins are read from the desktop's install directory `~/.la/plugin/<id>/`.
 Building the Android app needs the NDK, the Rust Android targets and cargo-ndk.
+
+## Startup screen
+
+Desktop's startup screen (`index.html`, `src/styles/startup.css`,
+`src/services/startupScreen.ts`) in three steps that show the same picture:
+the system's launch window (`Theme.LyricsAdapter.Launch`, the activity's theme
+in the manifest only), `StartupScreen` over the app from its first frame, and
+its lift once `AppScreen` reports the library read and the last playback
+restored. `MainActivity` switches to `Theme.LyricsAdapter` before it is
+created, so recreating the activity never shows the launch picture. What
+shows under the screen at its lift must be settled: restore without
+animation, and wait for what arrives late (the player reporting its track).
 
 ## Plugins in the app
 
@@ -116,10 +138,24 @@ Vorbis field. Word lyrics follow desktop's `wordLyricsTagService.ts`.
   `derivedStateOf`, so a frame redraws without recomposing; the spike's
   `LyricsView` keeps the UI thread under 3 ms per frame this way.
 - Blur and the AGSL background must stay switchable for slower devices.
-- The same rule covers AMLL's player (`@applemusic-like-lyrics/core`), which
-  desktop's focus mode uses: match what desktop's focus mode shows (measure it
-  in the running app over CDP, as sizes, alphas, blur and timings), and write
-  the Compose code yourself; do not port its source.
+- Laying out a song's lines costs a text layout and a layer each. `LyricsView`
+  lays out the lines around the sung one at once and the rest a few per frame
+  (`LINES_PER_FRAME`), after focus mode has slid in; `balancedLines` measures a
+  line once and reads word widths from it; `SungLinePainter` works out a
+  line's word timing when it is first sung. Keep opening focus mode to a
+  frame or two: check with `dumpsys gfxinfo <package> framestats` on the
+  profile build (about 35 ms for the first frame on the test phone).
+- Text drawn under a plain translation lands on whole pixels, so slow
+  motion of a few pixels (a word floating up, a line settling) moves in
+  visible one-pixel steps. Move such text as an offscreen layer instead, as
+  `SungLinePainter` does for moving words and letters and `LyricsView` for
+  each line; check with a screen recording that it moves every frame.
+- AMLL's player (`@applemusic-like-lyrics/core`), which desktop's focus mode
+  uses, may be ported: `lyrics/.../LineMotion.kt` ports its word animations
+  from the version desktop runs (the source is in that package's source map).
+  Ported files name the AMLL files they follow and keep its AGPL notice.
+  Check the result against desktop's running focus mode over CDP, as sizes,
+  alphas, blur and timings, and pin what desktop shows in tests.
 
 ## Matching desktop behaviour
 
@@ -132,11 +168,20 @@ values in tests (as `LegacyMusicPluginTest` does with vectors produced by Node).
 
 ## Releases
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the
-signed release APK (version name from the tag) and attaches it to the tag's
-GitHub release. It needs the `ANDROID_KEYSTORE_BASE64`,
+Releases follow desktop's flow. The version is `appVersionName` in the root
+`gradle.properties` (the version code is derived from it). Work reaches
+`master` through a pull request from `dev`, which runs
+`.github/workflows/pr-check.yml` (the JVM tests and `:app:assembleProfile`).
+Both workflows build with the runner's newest NDK (`ANDROID_NDK_LATEST_HOME`,
+read in the shell: the `env` context does not hold the runner's variables).
+`.github/workflows/release.yml` is run by hand
+(`gh workflow run release.yml --ref master`): it refuses a version that
+already has a tag or release, builds the signed APK, uploads it to a draft
+release and then publishes the draft, which is what creates the `v<version>`
+tag. Never push a `v*` tag yourself. `v0.*` and suffixed versions are marked
+pre-release. It needs the `ANDROID_KEYSTORE_BASE64`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`
-secrets. Release builds use R8: keep rules for reflection-based code (JNA and
+secrets and fails without them. Release builds use R8: keep rules for reflection-based code (JNA and
 the UniFFI bindings) live in `app/proguard-rules.pro`, and resources must be
 loaded by absolute path, because R8 moves classes between packages.
 

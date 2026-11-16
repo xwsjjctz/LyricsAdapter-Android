@@ -11,12 +11,17 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -40,9 +45,9 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalGraphicsContext
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -97,6 +102,21 @@ private fun lineBlur(distance: Float, strength: Float): Float {
     return (lines * BLUR_PER_LINE).coerceAtMost(MAX_BLUR) * strength
 }
 
+/**
+ * Laying out a line costs a text layout and its layer; a whole song's at once
+ * held focus mode's opening back by a third of a second. So the lines around
+ * the sung one, which are the ones on show, are laid out at once, and the rest
+ * stand in as empty rows that get their text a few per frame.
+ */
+private const val LINES_BEFORE = 2
+private const val LINES_AFTER = 8
+private const val LINES_PER_FRAME = 6
+
+private fun linesAround(active: Int, count: Int): IntRange =
+    (active - LINES_BEFORE).coerceIn(0, maxOf(count - 1, 0))..(active + LINES_AFTER).coerceIn(0, maxOf(count - 1, 0))
+
+private fun IntRange.including(other: IntRange): IntRange = minOf(first, other.first)..maxOf(last, other.last)
+
 /** After a manual scroll, how long the lyrics wait before following the song again. */
 private const val BROWSE_HOLD_MS = 3_000L
 
@@ -105,11 +125,12 @@ private const val BROWSE_HOLD_MS = 3_000L
  * and lights word by word; other lines are dim, a little smaller and blurred
  * by distance. A line change ripples down the list (see [LyricsScroller]).
  * Dragging scrolls freely and clears the blur; the lyrics return to the sung
- * line a few seconds later; [onScrollingChange] reports when that starts and
- * ends. Tapping a line seeks to it.
+ * line a few seconds later; [onDraggingChange] reports when a finger starts
+ * and stops dragging them. Tapping a line seeks to it.
  *
  * Playback time is read only while drawing and in the active-item
- * derivation, so most frames redraw without recomposing.
+ * derivation, so most frames redraw without recomposing. Until [layOutAll],
+ * only the lines around the sung one are laid out (see [LINES_PER_FRAME]).
  */
 @Composable
 fun LyricsView(
@@ -125,7 +146,8 @@ fun LyricsView(
     linePadding: Dp = LINE_PADDING,
     /** Translated text by line index, shown under each line. */
     translations: Map<Int, String> = emptyMap(),
-    onScrollingChange: (Boolean) -> Unit = {},
+    layOutAll: Boolean = true,
+    onDraggingChange: (Boolean) -> Unit = {},
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
     val style = remember(settings.fontSize) { lineStyle(settings.fontSize) }
@@ -149,8 +171,7 @@ fun LyricsView(
     // Only touched from callbacks, so changing it never recomposes.
     var browseJob by remember { mutableStateOf<Job?>(null) }
 
-    val latestOnScrollingChange by rememberUpdatedState(onScrollingChange)
-    LaunchedEffect(scrolling) { latestOnScrollingChange(scrolling) }
+    val latestOnDraggingChange by rememberUpdatedState(onDraggingChange)
 
     LaunchedEffect(scroller) {
         while (true) withFrameNanos { scroller.step(it, active) }
@@ -175,8 +196,28 @@ fun LyricsView(
     val dragState = rememberDraggableState { delta -> browse = (browse + delta).coerceIn(browseRange()) }
     val activeRank = items.getOrNull(active)?.rank ?: -1f
 
+    // The items laid out so far: those around the sung one always, and more each frame once all may be.
+    var grown by remember(items) { mutableStateOf(linesAround(active, items.size)) }
+    val laidOut = grown.including(linesAround(active, items.size))
+    val latestLaidOut by rememberUpdatedState(laidOut)
+    LaunchedEffect(items, layOutAll) {
+        if (!layOutAll) return@LaunchedEffect
+        while (latestLaidOut.first > 0 || latestLaidOut.last < items.lastIndex) {
+            withFrameNanos {}
+            val range = latestLaidOut
+            grown = (range.first - LINES_PER_FRAME / 2).coerceAtLeast(0)..(range.last + LINES_PER_FRAME / 2).coerceAtMost(items.lastIndex)
+        }
+    }
+    // What the measure pass last saw laid out, to tell a stand-in getting its height from a line changing its own.
+    val measuredRange = remember(items) { arrayOfNulls<IntRange>(1) }
+    val standInHeight = gap * 2 + with(density) { style.lineHeight.toDp() }
+
+    // Every line has the same room for its text, found once here instead of by each line for itself.
+    BoxWithConstraints(modifier) {
+    val textWidth = with(density) { constraints.maxWidth - linePadding.roundToPx() - (linePadding + LINE_END_EXTRA).roundToPx() }
     Layout(
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxSize()
             .clipToBounds()
             .fadeEdges(controlsHeight, controlsShown)
             .draggable(
@@ -185,8 +226,10 @@ fun LyricsView(
                 onDragStarted = {
                     browseJob?.cancel()
                     scrolling = true
+                    latestOnDraggingChange(true)
                 },
                 onDragStopped = { velocity ->
+                    latestOnDraggingChange(false)
                     browseJob = scope.launch {
                         animateDecay(browse, velocity, FloatExponentialDecaySpec()) { value, _ -> browse = value.coerceIn(browseRange()) }
                         delay(BROWSE_HOLD_MS)
@@ -199,6 +242,7 @@ fun LyricsView(
             items.forEachIndexed { index, item ->
                 key(index) {
                     when (item) {
+                        is LineItem if index !in laidOut -> Spacer(Modifier.fillMaxWidth().height(standInHeight))
                         is LineItem -> LyricLineText(
                             line = item.line,
                             distance = item.rank - activeRank,
@@ -210,6 +254,7 @@ fun LyricsView(
                             blurStrength = blurStrength,
                             translation = translations[item.index],
                             linePadding = linePadding,
+                            width = textWidth,
                             onClick = {
                                 onLineClick(item.line)
                                 followSong(after = 0)
@@ -230,9 +275,9 @@ fun LyricsView(
             y += placeable.height
         }
         val height = constraints.maxHeight
-        scroller.tops = tops
-        scroller.heights = IntArray(placeables.size) { placeables[it].height }
-        scroller.viewportHeight = height
+        val grew = measuredRange[0].let { it != null && it != laidOut }
+        measuredRange[0] = laidOut
+        scroller.measured(tops, IntArray(placeables.size) { placeables[it].height }, height, keepInPlace = grew)
         layout(constraints.maxWidth, height) {
             placeables.forEachIndexed { index, placeable ->
                 placeable.placeWithLayer(0, tops[index]) {
@@ -244,6 +289,7 @@ fun LyricsView(
                 }
             }
         }
+    }
     }
 }
 
@@ -259,39 +305,52 @@ private fun LyricLineText(
     blurStrength: Float,
     translation: String?,
     linePadding: Dp,
+    /** The room for the text, in pixels. */
+    width: Int,
     onClick: () -> Unit,
 ) {
     val active = distance == 0f
     val emphasis by animateFloatAsState(if (active) 1f else 0f, spring(dampingRatio = 1f, stiffness = 160f), label = "emphasis")
+    // When the line stopped being sung: its words then float back down.
+    var leftAtMs by remember(line) { mutableStateOf<Long?>(null) }
+    var wasActive by remember(line) { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        leftAtMs = if (active) null else if (wasActive) position() else leftAtMs
+        wasActive = active
+    }
     val blurTarget = if (scrolling || active) 0f else lineBlur(distance, blurStrength)
     val blur by animateFloatAsState(blurTarget, spring(stiffness = 120f), label = "blur")
-    val glowLayer = rememberGraphicsLayer()
 
-    BoxWithConstraints(
+    Box(
         Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(start = linePadding, end = linePadding + LINE_END_EXTRA, top = gap, bottom = gap)
             .graphicsLayer {
                 val scale = 0.97f + 0.03f * emphasis
                 scaleX = scale
                 scaleY = scale
-                transformOrigin = TransformOrigin(0f, 0.5f)
+                // About where the text starts.
+                transformOrigin = TransformOrigin(if (size.width > 0f) linePadding.toPx() / size.width else 0f, 0.5f)
+                // Offscreen, the line moves by fractions of a pixel while it scrolls instead of in whole-pixel steps.
+                // The layer takes in the padding, so words floating up, swelling and glowing are not cut off.
+                compositingStrategy = CompositingStrategy.Offscreen
                 val radius = cssBlurRadius(blur.dp.toPx())
                 renderEffect = if (radius > 0.5f && Build.VERSION.SDK_INT >= 31) BlurEffect(radius, radius, TileMode.Decal) else null
-            },
+            }
+            .padding(start = linePadding, end = linePadding + LINE_END_EXTRA, top = gap, bottom = gap),
     ) {
-        val width = constraints.maxWidth
         // Wrapped as desktop wraps it: between words, into lines of similar width.
         val laidOut = remember(line, style, width) { balancedLines(line.text, measurer, style, width) }
-        val painter = remember(laidOut, measurer, glowLayer) { SungLinePainter(line, measurer, style, glowLayer, laidOut.offsets) }
+        val graphics = LocalGraphicsContext.current
+        val painter = remember(laidOut, measurer, graphics) { SungLinePainter(line, style, laidOut.offsets, graphics) }
+        DisposableEffect(painter) { onDispose(painter::release) }
         Column {
         BasicText(
             text = laidOut.text,
             style = style,
             onTextLayout = painter::onLayout,
             modifier = Modifier.drawWithContent {
-                if (emphasis > 0f) painter.draw(this, position(), emphasis) else drawContent()
+                if (!painter.draw(this, position(), emphasis, leftAtMs)) drawContent()
             },
         )
         if (translation != null) {
@@ -329,7 +388,7 @@ private const val OTHER_LINE_ALPHA = 0.2f
  * The [BlurEffect] radius that blurs as much as CSS `blur(sigma)`: CSS takes
  * the Gaussian's deviation, Android a radius it turns into `0.57735 r + 0.5`.
  */
-private fun cssBlurRadius(sigma: Float): Float = ((sigma - 0.5f) / 0.57735f).coerceAtLeast(0f)
+internal fun cssBlurRadius(sigma: Float): Float = ((sigma - 0.5f) / 0.57735f).coerceAtLeast(0f)
 
 /** Desktop's `--focus-lyrics-edge-fade` and portrait bottom fade, each at most a quarter of the view. */
 private val TOP_FADE = 72.dp

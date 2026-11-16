@@ -12,17 +12,30 @@ import com.lyricsadapter.audiotags.TagUpdate
 import com.lyricsadapter.audiotags.WordLyrics
 import com.lyricsadapter.audiotags.WordLyricsUpdate
 import com.lyricsadapter.audiotags.writeTagsToFd
+import com.lyricsadapter.library.FolderSync
 import com.lyricsadapter.library.Track
 import com.lyricsadapter.lyrics.WordLyricsFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import com.lyricsadapter.audiotags.WordLyricsFormat as TagWordLyricsFormat
 
-/** How an import went; [failed] lists the files that could not be read, by name. */
-data class ImportResult(val imported: Int, val failed: List<String>)
+/**
+ * How an import went; [failed] lists the files that could not be read, by
+ * name. Looking through followed folders also counts the tracks [removed]
+ * because their files are gone, and the folders that could not be listed.
+ */
+data class ImportResult(val imported: Int, val failed: List<String>, val removed: Int = 0, val unreadableFolders: Int = 0) {
+    operator fun plus(other: ImportResult) =
+        ImportResult(imported + other.imported, failed + other.failed, removed + other.removed, unreadableFolders + other.unreadableFolders)
+}
+
+/** Reports how many of the files of an import have been read so far. */
+typealias ImportProgress = (done: Int, total: Int) -> Unit
 
 /** Changes made in the metadata editor; a null field is left as stored. */
 data class TrackEdit(
@@ -51,44 +64,129 @@ sealed interface EditResult {
 
 /**
  * The local library: files the user picked through the Storage Access
- * Framework, kept in Room. A track's id is its document URI, so picking a
- * file again refreshes it in place. Access to the files is persisted, read
- * and write where the provider allows it, so the library survives restarts
- * and the editor can save tags.
+ * Framework, singly or as whole folders, kept in Room. A track's id is its
+ * document URI, so picking a file again refreshes it in place. Access to the
+ * files is persisted, read and write where the provider allows it, so the
+ * library survives restarts and the editor can save tags.
+ *
+ * A picked folder is followed from then on ([folders]): looking through it
+ * again ([syncFolders]) brings in files added to it and drops tracks whose
+ * files are gone. A track of a folder that the user removes from the library
+ * is remembered in [exclusions], so it does not come back.
  */
 class LibraryRepository(
     private val resolver: ContentResolver,
     private val tracks: TrackDao,
     private val reader: TrackReader,
+    private val scanner: FolderScanner,
+    private val folders: Setting<Set<String>>,
+    private val exclusions: Setting<Set<String>>,
 ) {
     val all: Flow<List<Track>> = tracks.observeAll().map { entities -> entities.map(TrackEntity::toTrack) }
 
-    suspend fun import(uris: List<Uri>): ImportResult = withContext(Dispatchers.IO) {
-        val positions = tracks.positions().associate { it.id to it.position }
-        var nextPosition = (positions.values.maxOrNull() ?: -1) + 1
-        val failed = mutableListOf<String>()
-        val read = uris.mapNotNull { uri ->
+    /** One import or look through the folders at a time, so two never hand out the same place in the list. */
+    private val importing = Mutex()
+
+    suspend fun import(uris: List<Uri>, onProgress: ImportProgress = { _, _ -> }): ImportResult = withContext(Dispatchers.IO) {
+        importing.withLock { read(uris, persist = true, onProgress) }
+    }
+
+    /** Follows the folder [tree] from now on and imports the music in it, also what the user removed from it before. */
+    suspend fun importFolder(tree: Uri, onProgress: ImportProgress = { _, _ -> }): ImportResult = withContext(Dispatchers.IO) {
+        importing.withLock {
             try {
-                persistAccess(uri)
-                reader.read(uri, System.currentTimeMillis())
-            } catch (error: Exception) {
-                if (!error.isFileProblem()) throw error
-                val name = reader.displayName(uri)
-                Log.w(TAG, "Could not import $name", error)
-                failed += name
-                null
+                persistAccess(tree)
+            } catch (error: SecurityException) {
+                Log.w(TAG, "No lasting access to $tree", error)
+                return@withLock ImportResult(0, emptyList(), unreadableFolders = 1)
             }
+            val prefix = FolderScanner.idPrefix(tree.toString())
+            exclusions.set(exclusions.value.value.filterNotTo(LinkedHashSet()) { it.startsWith(prefix) })
+            folders.set(folders.value.value + tree.toString())
+            syncFolder(tree, onProgress)
         }
-        val entities = read.map { track -> track.toEntity(positions[track.id] ?: nextPosition++) }
-        tracks.upsert(entities)
-        ImportResult(imported = entities.size, failed = failed)
+    }
+
+    /** Looks through every followed folder: new files are imported, and tracks whose files are gone are removed. */
+    suspend fun syncFolders(onProgress: ImportProgress = { _, _ -> }): ImportResult = withContext(Dispatchers.IO) {
+        importing.withLock {
+            folders.value.value.fold(ImportResult(0, emptyList())) { result, folder -> result + syncFolder(Uri.parse(folder), onProgress) }
+        }
+    }
+
+    /** Stops following [tree] and removes its tracks from the library; the files themselves are untouched. */
+    suspend fun removeFolder(tree: Uri) = withContext(Dispatchers.IO) {
+        importing.withLock {
+            val prefix = FolderScanner.idPrefix(tree.toString())
+            drop(tracks.positions().map { it.id }.filter { it.startsWith(prefix) })
+            folders.set(folders.value.value - tree.toString())
+            exclusions.set(exclusions.value.value.filterNotTo(LinkedHashSet()) { it.startsWith(prefix) })
+            releaseAccess(tree)
+        }
     }
 
     /** Removes tracks from the library; the files themselves are untouched. */
     suspend fun remove(ids: Collection<String>) = withContext(Dispatchers.IO) {
-        tracks.delete(ids.toList())
+        val prefixes = folders.value.value.map(FolderScanner::idPrefix)
+        val fromFolders = ids.filter { id -> prefixes.any(id::startsWith) }
+        if (fromFolders.isNotEmpty()) exclusions.set(exclusions.value.value + fromFolders)
+        drop(ids)
+    }
+
+    private suspend fun drop(ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        // SQLite takes a limited number of values in one statement.
+        ids.chunked(DELETE_BATCH).forEach { tracks.delete(it) }
         ids.forEach { id -> releaseAccess(Uri.parse(id)) }
         reader.deleteCoversExcept(tracks.coverPaths().toSet())
+    }
+
+    private suspend fun syncFolder(tree: Uri, onProgress: ImportProgress): ImportResult {
+        val ids = tracks.positions().map { it.id }
+        val prefix = FolderScanner.idPrefix(tree.toString())
+        val ownIds = ids.filterTo(HashSet()) { it.startsWith(prefix) }
+        val listed = try {
+            scanner.list(tree)
+        } catch (error: Exception) {
+            if (!error.isFolderProblem()) throw error
+            Log.w(TAG, "Could not list $tree", error)
+            return ImportResult(0, emptyList(), unreadableFolders = 1)
+        }
+        // A storage that is not there may list nothing instead of failing; its tracks stay until it says otherwise.
+        if (listed.isEmpty() && ownIds.isNotEmpty()) return ImportResult(0, emptyList())
+        val keys = ids.mapNotNullTo(HashSet()) { scanner.keyOf(Uri.parse(it)) }
+        val changes = FolderSync.changes(listed, keys, ownIds, exclusions.value.value)
+        drop(changes.removed)
+        // The folder's grant covers its files; there is none to take for each.
+        return read(changes.added.map { Uri.parse(it.id) }, persist = false, onProgress).copy(removed = changes.removed.size)
+    }
+
+    /** Reads [uris] into the library a few at a time, so a long import shows up as it goes. */
+    private suspend fun read(uris: List<Uri>, persist: Boolean, onProgress: ImportProgress): ImportResult {
+        val positions = tracks.positions().associate { it.id to it.position }
+        var nextPosition = (positions.values.maxOrNull() ?: -1) + 1
+        val failed = mutableListOf<String>()
+        var imported = 0
+        var done = 0
+        uris.chunked(READ_BATCH).forEach { batch ->
+            val read = batch.mapNotNull { uri ->
+                try {
+                    if (persist) persistAccess(uri)
+                    reader.read(uri, System.currentTimeMillis())
+                } catch (error: Exception) {
+                    if (!error.isFileProblem()) throw error
+                    val name = reader.displayName(uri)
+                    Log.w(TAG, "Could not import $name", error)
+                    failed += name
+                    null
+                }
+            }
+            tracks.upsert(read.map { track -> track.toEntity(positions[track.id] ?: nextPosition++) })
+            imported += read.size
+            done += batch.size
+            onProgress(done, uris.size)
+        }
+        return ImportResult(imported = imported, failed = failed)
     }
 
     /** Writes [edit] into the file, then reads it back so the library shows what the file now holds. */
@@ -135,6 +233,9 @@ class LibraryRepository(
 
     private fun Exception.isFileProblem() = this is TagException || this is IOException || this is SecurityException
 
+    /** What listing a folder fails with when it was moved or deleted, its storage is gone, or its grant was taken back. */
+    private fun Exception.isFolderProblem() = this is IOException || this is SecurityException || this is IllegalArgumentException
+
     private fun TrackEdit.toUpdate(track: Track) = TagUpdate(
         title = title,
         artist = artist,
@@ -152,5 +253,7 @@ class LibraryRepository(
 
     private companion object {
         const val TAG = "LibraryRepository"
+        const val READ_BATCH = 8
+        const val DELETE_BATCH = 500
     }
 }
