@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -330,30 +331,22 @@ private fun LibraryHeader(
     var switcherAt by remember { mutableStateOf<IntOffset?>(null) }
     var managerAt by remember { mutableStateOf<IntOffset?>(null) }
     var moreAt by remember { mutableStateOf<IntOffset?>(null) }
-    var headerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var titleCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var moreCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val openSwitcher = {
+    val openSwitcher by rememberUpdatedState {
         titleCoordinates?.below()?.let { anchor ->
             switcherAt = anchor
             menus.onSlotMenuOpen()
         }
     }
+    val scrollToTop by rememberUpdatedState(onScrollToTop)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { headerCoordinates = it }
-            // A tap on the title opens the slot menu; a double tap anywhere here goes back to the top.
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offset ->
-                        val header = headerCoordinates ?: return@detectTapGestures
-                        val title = titleCoordinates ?: return@detectTapGestures
-                        if (header.localBoundingBoxOf(title).contains(offset)) openSwitcher()
-                    },
-                    onDoubleTap = { onScrollToTop() },
-                )
-            }
+            // A double tap on the empty part of the header goes back to the top. The title takes its own
+            // taps (below): a tap that could still become a double tap waits out the double-tap timeout,
+            // which held the slot menu back by 300 ms when both were told apart here.
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { scrollToTop() }) }
             .padding(start = 20.dp, end = 8.dp, top = if (compact) 4.dp else 12.dp, bottom = if (compact) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -362,6 +355,7 @@ private fun LibraryHeader(
             Row(
                 Modifier
                     .onGloballyPositioned { titleCoordinates = it }
+                    .pointerInput(Unit) { detectTapGestures(onTap = { openSwitcher() }) }
                     .semantics {
                         contentDescription = switchLabel
                         role = Role.Button
