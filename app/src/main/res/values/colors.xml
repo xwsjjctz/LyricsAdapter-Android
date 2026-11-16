@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The startup artwork's average colour (tools/startup/generate.py prints it): what the launch window shows before the artwork can be drawn. -->
+    <color name="startup_background">#E3B8E3</color>
+</resources>

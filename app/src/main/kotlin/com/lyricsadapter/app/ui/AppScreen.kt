@@ -7,6 +7,10 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -120,16 +124,20 @@ private val LANDSCAPE_MINI_PLAYER_MAX_WIDTH = 480.dp
 /** How long a fresh start waits for the saved track's list to load before giving up on restoring it. */
 private const val RESTORE_TIMEOUT_MS = 15_000L
 
+/** How long it then waits for the player to report the track it was given. */
+private const val PLAYER_LOAD_TIMEOUT_MS = 1_000L
+
 /**
  * The app's one screen: the playlist and settings pages, Apple Music's
  * bottom bars over them (the always-present mini player above a Liquid Glass
  * tab bar, which is tapped or dragged to switch pages), and the pages that
  * open over them (metadata editor, focus mode). Back closes the topmost
  * page, then returns to the playlist. What played last is saved as it
- * changes and loaded again, paused, on a fresh start.
+ * changes and loaded again, paused, on a fresh start; [onSettled] is called
+ * once the library is read and that is done, for the startup screen to lift.
  */
 @Composable
-fun AppScreen(container: AppContainer) {
+fun AppScreen(container: AppContainer, onSettled: () -> Unit = {}) {
     val library: LibraryViewModel = viewModel { LibraryViewModel(container) }
     val player = container.player
     val settings = container.settings
@@ -167,6 +175,10 @@ fun AppScreen(container: AppContainer) {
 
     val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> library.import(uris) }
     val importFiles = { pickFiles.launch(arrayOf("audio/*")) }
+    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree -> library.importFolder(tree) }
+    val importFolder = { pickFolder.launch(null) }
+    val folders by settings.libraryFolders.value.collectAsStateWithLifecycle()
+    val importProgress by library.importProgress.collectAsStateWithLifecycle()
     LaunchedEffect(library) { library.events.collect { notice -> context.showNotice(notice) } }
     LaunchedEffect(container.downloads) { container.downloads.results.collect { outcome -> context.showDownload(outcome) } }
 
@@ -249,6 +261,7 @@ fun AppScreen(container: AppContainer) {
     // A fresh start picks up where playback stood, paused; a playback service still holding a queue is left alone.
     var restored by rememberSaveable { mutableStateOf(false) }
     val latestTracksOf by rememberUpdatedState(tracksOf)
+    val latestSlot by rememberUpdatedState(slot)
     LaunchedEffect(Unit) {
         if (restored) return@LaunchedEffect
         player.awaitConnected()
@@ -268,8 +281,13 @@ fun AppScreen(container: AppContainer) {
             }
         }
         if (saved != null && player.state.value.currentId == null) {
-            val list = withTimeoutOrNull(RESTORE_TIMEOUT_MS) {
-                snapshotFlow { latestTracksOf(saved.slot) }.first { tracks -> tracks.any { it.id == saved.trackId } }
+            val list = if (saved.slot == SlotId.Local) {
+                // The local library is whole once read: a song no longer in it is not waited for.
+                library.awaitTracks().takeIf { tracks -> tracks.any { it.id == saved.trackId } }
+            } else {
+                withTimeoutOrNull(RESTORE_TIMEOUT_MS) {
+                    snapshotFlow { latestTracksOf(saved.slot) }.first { tracks -> tracks.any { it.id == saved.trackId } }
+                }
             }
             // A song picked while the list was still loading wins over the saved one.
             if (list != null && player.state.value.currentId == null) {
@@ -277,11 +295,17 @@ fun AppScreen(container: AppContainer) {
                 queueSlot = saved.slot
                 player.load(list, index, saved.positionMs)
                 switchSlot(saved.slot)
-                scrollTo(index, list.size)
+                // All of it at once and waited for: this happens under the startup screen, which lifts on the settled page.
+                snapshotFlow { latestSlot }.first { it == saved.slot }
+                listState.scrollToItem(if (layout == LibraryLayout.Wall) wallBlockOf(index, list.size, wallColumns) else index)
+                withTimeoutOrNull(PLAYER_LOAD_TIMEOUT_MS) { player.state.first { it.currentId == saved.trackId } }
             }
         }
         restored = true
     }
+    val libraryLoaded by library.loaded.collectAsStateWithLifecycle()
+    val settled by rememberUpdatedState(onSettled)
+    LaunchedEffect(restored, libraryLoaded) { if (restored && libraryLoaded) settled() }
     val savePlayback = {
         val id = player.state.value.currentId
         if (restored && id != null) settings.lastPlayback.set(LastPlayback(queueSlot, id, player.positionMs()))
@@ -302,6 +326,8 @@ fun AppScreen(container: AppContainer) {
         cloudConnected = cloudStatus != CloudStatus.NotConnected,
         wall = layout == LibraryLayout.Wall,
         importFiles = importFiles,
+        importFolder = importFolder,
+        rescanFolders = if (folders.isEmpty()) null else library::rescanFolders,
         refreshCloud = container.cloud::refresh,
         playAll = { playFrom(slot, slotTracks, 0) },
         shuffleAll = {
@@ -411,6 +437,8 @@ fun AppScreen(container: AppContainer) {
                                     refreshCloud = container.cloud::refresh,
                                 ),
                                 status = when {
+                                    slot == SlotId.Local && importProgress != null ->
+                                        importProgress?.let { (done, total) -> stringResource(R.string.import_progress, done, total) }
                                     slot == SlotId.Cloud && cloudStatus == CloudStatus.Loading -> stringResource(R.string.cloud_loading)
                                     slot == SlotId.Playlist && openedPlaylist != null -> openedPlaylist?.playlist?.name
                                     else -> null
@@ -451,11 +479,17 @@ fun AppScreen(container: AppContainer) {
             val lastTrack = remember { arrayOfNulls<Track>(1) }
             if (current != null) lastTrack[0] = current
             val focusTrack = current ?: lastTrack[0]
-            AnimatedVisibility(visible = focusOpen && focusTrack != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+            AnimatedVisibility(
+                visible = focusOpen && focusTrack != null,
+                enter = slideInVertically(FOCUS_SLIDE_IN) { it },
+                exit = slideOutVertically(FOCUS_SLIDE_OUT) { it },
+            ) {
                 if (focusTrack != null) {
-                    val focusLines = remember(focusTrack.id) { focusTrack.parsedLyrics().lines }
-                    val translation = rememberFocusTranslation(container, focusTrack, focusLines)
-                    FocusScreen(focusTrack, playerState, player, container.volume, focusSettings, translation, onClose = { focusOpen = false })
+                    val focusLyrics = remember(focusTrack.id) { focusTrack.parsedLyrics() }
+                    val translation = rememberFocusTranslation(container, focusTrack, focusLyrics.lines)
+                    // Until the page has arrived, only the lines on show are laid out: a whole song's would hold the slide back.
+                    val arrived = transition.currentState == EnterExitState.Visible
+                    FocusScreen(focusTrack, focusLyrics, playerState, player, container.volume, focusSettings, translation, arrived = arrived, onClose = { focusOpen = false })
                 }
             }
             AnimatedVisibility(visible = editing != null, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
@@ -525,6 +559,13 @@ private fun PageTabBar(page: () -> MainPage, onPage: (MainPage) -> Unit, backdro
     }
 }
 
+/**
+ * Focus mode rises like a sheet: a soft spring without bounce, about half a second to settle, slower than
+ * the default at the owner's request (2026-11-14); it leaves a little quicker than it comes.
+ */
+private val FOCUS_SLIDE_IN = spring(dampingRatio = 1f, stiffness = 170f, visibilityThreshold = IntOffset.VisibilityThreshold)
+private val FOCUS_SLIDE_OUT = spring(dampingRatio = 1f, stiffness = 260f, visibilityThreshold = IntOffset.VisibilityThreshold)
+
 /** How much the page blurs under an open menu. */
 private val MENU_BLUR = 10.dp
 
@@ -540,6 +581,9 @@ private fun moreActions(
     cloudConnected: Boolean,
     wall: Boolean,
     importFiles: () -> Unit,
+    importFolder: () -> Unit,
+    /** Null while no folder is followed. */
+    rescanFolders: (() -> Unit)?,
     refreshCloud: () -> Unit,
     playAll: () -> Unit,
     shuffleAll: () -> Unit,
@@ -553,7 +597,11 @@ private fun moreActions(
     }
     if (hasCurrent) add(MenuEntry.Item(stringResource(R.string.command_locate), R.drawable.ui_my_location, onClick = locateCurrent))
     if (isNotEmpty()) add(MenuEntry.Separator)
-    if (slot == SlotId.Local) add(MenuEntry.Item(stringResource(R.string.import_files), R.drawable.ui_library_add, onClick = importFiles))
+    if (slot == SlotId.Local) {
+        add(MenuEntry.Item(stringResource(R.string.import_files), R.drawable.ui_library_add, onClick = importFiles))
+        add(MenuEntry.Item(stringResource(R.string.import_folder), R.drawable.ui_create_new_folder, onClick = importFolder))
+        if (rescanFolders != null) add(MenuEntry.Item(stringResource(R.string.rescan_folders), R.drawable.ui_sync, onClick = rescanFolders))
+    }
     if (slot == SlotId.Cloud && cloudConnected) add(MenuEntry.Item(stringResource(R.string.cloud_refresh), R.drawable.ui_sync, onClick = refreshCloud))
     if (hasTracks && (slot == SlotId.Local || slot == SlotId.Online)) {
         add(MenuEntry.Item(stringResource(R.string.select_multiple), R.drawable.ui_checklist, onClick = selectMultiple))
@@ -636,6 +684,8 @@ private fun qualityLabel(id: String): String = DownloadQuality.entries.firstOrNu
 
 private fun Context.showNotice(notice: LibraryNotice) {
     val message = when (notice) {
+        is LibraryNotice.Imported if notice.result.imported == 0 && notice.result.failed.isEmpty() ->
+            getString(if (notice.result.unreadableFolders > 0) R.string.import_folder_failed else R.string.import_nothing_new)
         is LibraryNotice.Imported -> buildString {
             append(resources.getQuantityString(R.plurals.import_done, notice.result.imported, notice.result.imported))
             if (notice.result.failed.isNotEmpty()) {

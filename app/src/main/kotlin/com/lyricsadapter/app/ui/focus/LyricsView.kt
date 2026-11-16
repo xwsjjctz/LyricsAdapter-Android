@@ -11,8 +11,12 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
@@ -98,6 +102,21 @@ private fun lineBlur(distance: Float, strength: Float): Float {
     return (lines * BLUR_PER_LINE).coerceAtMost(MAX_BLUR) * strength
 }
 
+/**
+ * Laying out a line costs a text layout and its layer; a whole song's at once
+ * held focus mode's opening back by a third of a second. So the lines around
+ * the sung one, which are the ones on show, are laid out at once, and the rest
+ * stand in as empty rows that get their text a few per frame.
+ */
+private const val LINES_BEFORE = 2
+private const val LINES_AFTER = 8
+private const val LINES_PER_FRAME = 6
+
+private fun linesAround(active: Int, count: Int): IntRange =
+    (active - LINES_BEFORE).coerceIn(0, maxOf(count - 1, 0))..(active + LINES_AFTER).coerceIn(0, maxOf(count - 1, 0))
+
+private fun IntRange.including(other: IntRange): IntRange = minOf(first, other.first)..maxOf(last, other.last)
+
 /** After a manual scroll, how long the lyrics wait before following the song again. */
 private const val BROWSE_HOLD_MS = 3_000L
 
@@ -110,7 +129,8 @@ private const val BROWSE_HOLD_MS = 3_000L
  * and stops dragging them. Tapping a line seeks to it.
  *
  * Playback time is read only while drawing and in the active-item
- * derivation, so most frames redraw without recomposing.
+ * derivation, so most frames redraw without recomposing. Until [layOutAll],
+ * only the lines around the sung one are laid out (see [LINES_PER_FRAME]).
  */
 @Composable
 fun LyricsView(
@@ -126,6 +146,7 @@ fun LyricsView(
     linePadding: Dp = LINE_PADDING,
     /** Translated text by line index, shown under each line. */
     translations: Map<Int, String> = emptyMap(),
+    layOutAll: Boolean = true,
     onDraggingChange: (Boolean) -> Unit = {},
 ) {
     val items = remember(lines) { buildLyricItems(lines) }
@@ -175,8 +196,28 @@ fun LyricsView(
     val dragState = rememberDraggableState { delta -> browse = (browse + delta).coerceIn(browseRange()) }
     val activeRank = items.getOrNull(active)?.rank ?: -1f
 
+    // The items laid out so far: those around the sung one always, and more each frame once all may be.
+    var grown by remember(items) { mutableStateOf(linesAround(active, items.size)) }
+    val laidOut = grown.including(linesAround(active, items.size))
+    val latestLaidOut by rememberUpdatedState(laidOut)
+    LaunchedEffect(items, layOutAll) {
+        if (!layOutAll) return@LaunchedEffect
+        while (latestLaidOut.first > 0 || latestLaidOut.last < items.lastIndex) {
+            withFrameNanos {}
+            val range = latestLaidOut
+            grown = (range.first - LINES_PER_FRAME / 2).coerceAtLeast(0)..(range.last + LINES_PER_FRAME / 2).coerceAtMost(items.lastIndex)
+        }
+    }
+    // What the measure pass last saw laid out, to tell a stand-in getting its height from a line changing its own.
+    val measuredRange = remember(items) { arrayOfNulls<IntRange>(1) }
+    val standInHeight = gap * 2 + with(density) { style.lineHeight.toDp() }
+
+    // Every line has the same room for its text, found once here instead of by each line for itself.
+    BoxWithConstraints(modifier) {
+    val textWidth = with(density) { constraints.maxWidth - linePadding.roundToPx() - (linePadding + LINE_END_EXTRA).roundToPx() }
     Layout(
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxSize()
             .clipToBounds()
             .fadeEdges(controlsHeight, controlsShown)
             .draggable(
@@ -201,6 +242,7 @@ fun LyricsView(
             items.forEachIndexed { index, item ->
                 key(index) {
                     when (item) {
+                        is LineItem if index !in laidOut -> Spacer(Modifier.fillMaxWidth().height(standInHeight))
                         is LineItem -> LyricLineText(
                             line = item.line,
                             distance = item.rank - activeRank,
@@ -212,6 +254,7 @@ fun LyricsView(
                             blurStrength = blurStrength,
                             translation = translations[item.index],
                             linePadding = linePadding,
+                            width = textWidth,
                             onClick = {
                                 onLineClick(item.line)
                                 followSong(after = 0)
@@ -232,9 +275,9 @@ fun LyricsView(
             y += placeable.height
         }
         val height = constraints.maxHeight
-        scroller.tops = tops
-        scroller.heights = IntArray(placeables.size) { placeables[it].height }
-        scroller.viewportHeight = height
+        val grew = measuredRange[0].let { it != null && it != laidOut }
+        measuredRange[0] = laidOut
+        scroller.measured(tops, IntArray(placeables.size) { placeables[it].height }, height, keepInPlace = grew)
         layout(constraints.maxWidth, height) {
             placeables.forEachIndexed { index, placeable ->
                 placeable.placeWithLayer(0, tops[index]) {
@@ -246,6 +289,7 @@ fun LyricsView(
                 }
             }
         }
+    }
     }
 }
 
@@ -261,6 +305,8 @@ private fun LyricLineText(
     blurStrength: Float,
     translation: String?,
     linePadding: Dp,
+    /** The room for the text, in pixels. */
+    width: Int,
     onClick: () -> Unit,
 ) {
     val active = distance == 0f
@@ -275,7 +321,7 @@ private fun LyricLineText(
     val blurTarget = if (scrolling || active) 0f else lineBlur(distance, blurStrength)
     val blur by animateFloatAsState(blurTarget, spring(stiffness = 120f), label = "blur")
 
-    BoxWithConstraints(
+    Box(
         Modifier
             .fillMaxWidth()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
@@ -293,7 +339,6 @@ private fun LyricLineText(
             }
             .padding(start = linePadding, end = linePadding + LINE_END_EXTRA, top = gap, bottom = gap),
     ) {
-        val width = constraints.maxWidth
         // Wrapped as desktop wraps it: between words, into lines of similar width.
         val laidOut = remember(line, style, width) { balancedLines(line.text, measurer, style, width) }
         val graphics = LocalGraphicsContext.current

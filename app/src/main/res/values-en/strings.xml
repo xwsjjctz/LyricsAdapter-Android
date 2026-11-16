@@ -23,6 +23,11 @@
     <string name="cloud_refresh">Refresh cloud library</string>
     <string name="retry">Retry</string>
     <string name="import_files">Import Files</string>
+    <string name="import_folder">Import Folder</string>
+    <string name="rescan_folders">Rescan Folders</string>
+    <string name="import_progress">Importing %1$d / %2$d…</string>
+    <string name="import_nothing_new">No new songs</string>
+    <string name="import_folder_failed">This folder can\'t be read</string>
     <plurals name="import_done">
         <item quantity="one">Imported %d song</item>
         <item quantity="other">Imported %d songs</item>
@@ -113,6 +118,10 @@
     <string name="cloud_not_connected">Not connected</string>
     <string name="settings_language">Language</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_folders">Local Folders</string>
+    <string name="settings_folders_footer">Songs added to a folder are imported when the app opens. Removing a folder takes its songs out of the library; the audio files are kept.</string>
+    <string name="settings_folders_empty">No folders imported yet</string>
+    <string name="folder_remove_title">Remove this folder?</string>
     <string name="appearance_system">Match System</string>
     <string name="focus_background">Background</string>
     <string name="focus_flowing_background">Flowing Background</string>

@@ -4,6 +4,7 @@ import android.icu.text.BreakIterator
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import java.util.Locale
+import kotlin.math.abs
 
 /** How much wider than the narrowest split the later lines may be, as a share of the widest piece. */
 private const val TIE_SHARE = 0.05f
@@ -31,12 +32,20 @@ internal fun balancedLines(original: String, measurer: TextMeasurer, style: Text
     }
     if (stops.size <= 2) return unchanged
     val pieces = stops.zipWithNext()
-    fun measure(piece: String) = measurer.measure(piece, style, softWrap = false, maxLines = 1).size.width.toFloat()
+    // The text is laid out once, on one line, and a piece is as wide as the distance between its ends
+    // there: what it takes up in the real layout. Measuring each piece by itself costs a text layout per
+    // word (most of the time it took to open focus mode) and comes out a little wide, since letter
+    // spacing is not tightened at a piece's edges.
+    val whole = measurer.measure(text, style, softWrap = false, maxLines = 1)
+    if (whole.lineCount != 1 || whole.getLineEnd(0) != text.length) return unchanged
+    fun span(start: Int, end: Int) =
+        abs(whole.getHorizontalPosition(end, usePrimaryDirection = true) - whole.getHorizontalPosition(start, usePrimaryDirection = true))
     // A piece's width inside a line, and at a line's end, where its trailing space does not count.
-    val inside = pieces.map { (start, end) -> measure(text.substring(start, end)) }
+    val inside = pieces.map { (start, end) -> span(start, end) }
     val atEnd = pieces.mapIndexed { index, (start, end) ->
-        val piece = text.substring(start, end)
-        if (piece.last().isWhitespace()) measure(piece.trimEnd()) else inside[index]
+        var trimmed = end
+        while (trimmed > start && text[trimmed - 1].isWhitespace()) trimmed--
+        if (trimmed < end) span(start, trimmed) else inside[index]
     }
     val room = width - 1f
     if (atEnd.any { it > room }) return unchanged

@@ -52,6 +52,8 @@ import com.lyricsadapter.app.ui.PillButton
 import com.lyricsadapter.webdav.WebDavClient
 import com.lyricsadapter.webdav.WebDavConfig
 import com.lyricsadapter.webdav.WebDavException
+import com.lyricsadapter.app.data.FolderScanner
+import com.lyricsadapter.app.ui.ConfirmDialog
 import kotlinx.coroutines.launch
 import com.lyricsadapter.app.ui.blocksTouches
 
@@ -128,7 +130,7 @@ fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: 
                 )
                 else -> when (page) {
                 SettingsPage.Root -> RootPage(container, onOpen = { location = SettingsLocation(it) })
-                SettingsPage.General -> GeneralPage(settings)
+                SettingsPage.General -> GeneralPage(container)
                 SettingsPage.Focus -> FocusPage(settings)
                 SettingsPage.Cloud -> CloudPage(settings)
                 SettingsPage.Plugins -> PluginsPage(container, onOpenPlugin = { location = location.copy(plugin = it) })
@@ -169,7 +171,8 @@ private fun RootPage(container: AppContainer, onOpen: (SettingsPage) -> Unit) {
 }
 
 @Composable
-private fun GeneralPage(settings: AppSettings) {
+private fun GeneralPage(container: AppContainer) {
+    val settings = container.settings
     val mode by settings.colorMode.value.collectAsStateWithLifecycle()
     if (AppLanguage.supported) LanguageGroup()
     SettingsGroup(title = stringResource(R.string.settings_appearance)) {
@@ -181,6 +184,39 @@ private fun GeneralPage(settings: AppSettings) {
             ),
             selected = mode,
             onSelect = settings.colorMode::set,
+        )
+    }
+    FoldersGroup(container)
+}
+
+/** The folders the local library follows; tapping one asks to remove it, and its songs with it. */
+@Composable
+private fun FoldersGroup(container: AppContainer) {
+    val folders by container.settings.libraryFolders.value.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var removing by remember { mutableStateOf<String?>(null) }
+    SettingsGroup(title = stringResource(R.string.settings_folders), footer = stringResource(R.string.settings_folders_footer)) {
+        if (folders.isEmpty()) SettingsRow(stringResource(R.string.settings_folders_empty))
+        folders.forEachIndexed { index, folder ->
+            if (index > 0) RowDivider(indent = true)
+            SettingsRow(
+                FolderScanner.label(Uri.parse(folder)),
+                icon = R.drawable.ui_folder,
+                detail = stringResource(R.string.remove),
+                chevron = false,
+                onClick = { removing = folder },
+            )
+        }
+    }
+    removing?.let { folder ->
+        ConfirmDialog(
+            title = stringResource(R.string.folder_remove_title),
+            message = stringResource(R.string.remove_confirm_message),
+            confirmLabel = stringResource(R.string.remove),
+            cancelLabel = stringResource(R.string.cancel),
+            danger = true,
+            onConfirm = { scope.launch { container.library.removeFolder(Uri.parse(folder)) } },
+            onDismiss = { removing = null },
         )
     }
 }

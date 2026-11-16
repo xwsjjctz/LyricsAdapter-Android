@@ -77,11 +77,13 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
     val libraryLayout: Setting<LibraryLayout> = enumSetting("libraryMode", LibraryLayout.Wall)
 
     /** Desktop's playlist overrides, hidden ones only: `source:id` of each playlist left out of the library. */
-    val hiddenPlaylists: Setting<Set<String>> = Setting(
-        prefs,
-        "hiddenPlaylists",
-        prefs.getString("hiddenPlaylists", null)?.split('\n')?.filterTo(mutableSetOf(), String::isNotEmpty).orEmpty(),
-    ) { it.joinToString("\n") }
+    val hiddenPlaylists: Setting<Set<String>> = stringSetSetting("hiddenPlaylists")
+
+    /** The folders the local library follows, as document tree URIs. */
+    val libraryFolders: Setting<Set<String>> = stringSetSetting("libraryFolders")
+
+    /** Tracks of those folders that the user removed from the library; looking through a folder again leaves them out. */
+    val folderExclusions: Setting<Set<String>> = stringSetSetting("folderExclusions")
 
     /** What played last, and where; null until something has played. */
     val lastPlayback: Setting<LastPlayback?> =
@@ -121,6 +123,10 @@ class AppSettings(context: Context, private val secrets: SecretStore) {
         val password = secrets.get("webdavPassword") ?: return null
         return WebDavConfig(url, username, password)
     }
+
+    /** A set of strings without line breaks, as URIs and ids are. */
+    private fun stringSetSetting(key: String): Setting<Set<String>> =
+        Setting(prefs, key, prefs.getString(key, null)?.split('\n')?.filterTo(LinkedHashSet(), String::isNotEmpty).orEmpty()) { it.joinToString("\n") }
 
     private inline fun <reified T : Enum<T>> enumSetting(key: String, default: T): Setting<T> {
         val stored = prefs.getString(key, null)

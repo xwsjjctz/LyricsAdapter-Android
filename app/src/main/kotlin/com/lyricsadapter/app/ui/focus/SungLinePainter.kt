@@ -91,19 +91,31 @@ internal class SungLinePainter(
     private val graphics: GraphicsContext,
 ) {
     private val wordTimed = line.words.isNotEmpty() && line.words.sumOf { it.text.length } == line.text.length
-    private val motion = if (wordTimed) LineMotion(line) else null
-    private val atoms = motion?.atoms.orEmpty()
-    private val drawn = motion?.words.orEmpty()
 
-    /** For each drawn word, its emphasis and which of that emphasis's letters it holds. */
-    private val held: List<Pair<Emphasis, List<Int>>?> = drawn.map { atomIndex ->
-        val atom = atoms[atomIndex]
-        motion?.emphases?.firstNotNullOfOrNull { emphasis ->
-            val letters = emphasis.letters.indices.filter { emphasis.letters[it].first >= atom.start && emphasis.letters[it].last < atom.end }
-            if (letters.isEmpty()) null else emphasis to letters
+    /**
+     * The line's word timing. It is worked out when the line is first sung:
+     * most lines are never reached while focus mode shows, and working all
+     * of them out up front delayed its opening.
+     */
+    private val timing by lazy(LazyThreadSafetyMode.NONE) { Timing(line) }
+    private val atoms get() = timing.motion.atoms
+    private val drawn get() = timing.motion.words
+    private val held get() = timing.held
+    private val emphasisEndsAtMs get() = timing.emphasisEndsAtMs
+
+    private class Timing(line: LyricLine) {
+        val motion = LineMotion(line)
+
+        /** For each drawn word, its emphasis and which of that emphasis's letters it holds. */
+        val held: List<Pair<Emphasis, List<Int>>?> = motion.words.map { atomIndex ->
+            val atom = motion.atoms[atomIndex]
+            motion.emphases.firstNotNullOfOrNull { emphasis ->
+                val letters = emphasis.letters.indices.filter { emphasis.letters[it].first >= atom.start && emphasis.letters[it].last < atom.end }
+                if (letters.isEmpty()) null else emphasis to letters
+            }
         }
+        val emphasisEndsAtMs = motion.emphases.maxOfOrNull { it.endMs } ?: 0.0
     }
-    private val emphasisEndsAtMs = motion?.emphases?.maxOfOrNull { it.endMs } ?: 0.0
 
     private var layout: TextLayoutResult? = null
     private var placed: Placed? = null
@@ -124,16 +136,19 @@ internal class SungLinePainter(
     fun onLayout(result: TextLayoutResult) {
         layout = result
         ranges.clear()
-        placed = motion?.let { motion ->
-            val left = FloatArray(drawn.size)
-            val width = FloatArray(drawn.size)
-            drawn.forEachIndexed { index, atomIndex ->
-                val atom = atoms[atomIndex]
-                left[index] = result.getBoundingBox(offsets[atom.start]).left
-                width[index] = result.getBoundingBox(offsets[atom.end - 1]).right - left[index]
-            }
-            Placed(left, width, Sweep(motion, width, result.lineHeightPx() * WORD_FADE_WIDTH))
+        placed = null
+    }
+
+    /** Where the words sit in [result], worked out when the line is first drawn sung. */
+    private fun place(result: TextLayoutResult): Placed {
+        val left = FloatArray(drawn.size)
+        val width = FloatArray(drawn.size)
+        drawn.forEachIndexed { index, atomIndex ->
+            val atom = atoms[atomIndex]
+            left[index] = result.getBoundingBox(offsets[atom.start]).left
+            width[index] = result.getBoundingBox(offsets[atom.end - 1]).right - left[index]
         }
+        return Placed(left, width, Sweep(timing.motion, width, result.lineHeightPx() * WORD_FADE_WIDTH))
     }
 
     private fun TextLayoutResult.lineHeightPx(): Float = if (lineCount > 1) getLineBaseline(1) - getLineBaseline(0) else size.height.toFloat()
@@ -145,17 +160,17 @@ internal class SungLinePainter(
      */
     fun draw(scope: DrawScope, positionMs: Long, emphasis: Float, leftAtMs: Long?): Boolean = with(scope) {
         val layout = layout ?: return false
-        val motion = motion
-        val placed = placed
-        if (motion == null || placed == null) {
+        if (!wordTimed) {
             if (emphasis <= 0f) return false
             drawText(layout, color = lerp(INACTIVE, WHOLE_LINE, emphasis))
             return true
         }
-        if (emphasis <= 0f) {
-            // Not reached yet, or left long enough ago that every word has come back to rest.
-            if (leftAtMs == null || positionMs >= maxOf(motion.restsAtMs(leftAtMs), emphasisEndsAtMs)) return false
-        }
+        // Not reached yet: nothing of the line's timing is needed.
+        if (emphasis <= 0f && leftAtMs == null) return false
+        val motion = timing.motion
+        // Left long enough ago that every word has come back to rest.
+        if (emphasis <= 0f && leftAtMs != null && positionMs >= maxOf(motion.restsAtMs(leftAtMs), emphasisEndsAtMs)) return false
+        val placed = placed ?: place(layout).also { placed = it }
         val colors = Colors(lerp(INACTIVE, SUNG, emphasis), lerp(INACTIVE, UPCOMING, emphasis))
         val em = style.fontSize.toPx()
         // Whole pixels, so a word that has floated up lands where the settled words are drawn.

@@ -51,6 +51,8 @@ ICONS = {
     "ui_history": ("history", UI, None),
     "ui_info": ("info", UI, None),
     "ui_library_add": ("library_add", UI, None),
+    "ui_create_new_folder": ("create_new_folder", UI, None),
+    "ui_folder": ("folder", UI, None),
     "ui_light_mode": ("light_mode", UI, None),
     "ui_login": ("login", UI, None),
     "ui_logout": ("logout", UI, None),

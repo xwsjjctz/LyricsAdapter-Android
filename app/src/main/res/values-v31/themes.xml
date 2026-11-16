@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12's splash screen draws its icon 288dp wide; the logo is the middle third of startup_icon. -->
+    <style name="Theme.LyricsAdapter.Launch">
+        <item name="android:windowBackground">@drawable/startup_window</item>
+        <item name="android:windowSplashScreenBackground">@color/startup_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/startup_icon</item>
+    </style>
+</resources>

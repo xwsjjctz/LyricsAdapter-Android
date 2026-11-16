@@ -60,6 +60,7 @@ import com.lyricsadapter.app.playback.PlayerState
 import com.lyricsadapter.app.playback.SystemVolume
 import com.lyricsadapter.app.ui.Cover
 import com.lyricsadapter.library.Track
+import com.lyricsadapter.lyrics.ParsedLyrics
 import kotlinx.coroutines.launch
 import com.lyricsadapter.app.ui.blocksTouches
 import androidx.compose.foundation.layout.WindowInsets
@@ -109,14 +110,17 @@ private const val LANDSCAPE_LYRICS_HEIGHT = 0.6f
 @Composable
 fun FocusScreen(
     track: Track,
+    /** [track]'s lyrics, parsed by the caller, which needs them too. */
+    lyrics: ParsedLyrics,
     playback: PlayerState,
     player: PlayerConnection,
     volume: SystemVolume,
     settings: FocusSettings,
     translation: FocusTranslation,
+    /** False while the page is still sliding in: the lyrics then lay out only the lines on show. */
+    arrived: Boolean,
     onClose: () -> Unit,
 ) {
-    val lyrics = remember(track.id) { track.parsedLyrics() }
     val clock = rememberFocusClock(player, playback.isPlaying, track.id)
     val volumeLevel by volume.level.collectAsStateWithLifecycle(initialValue = volume.current())
     LightSystemBars(false)
@@ -156,6 +160,7 @@ fun FocusScreen(
                     anchor = anchor,
                     linePadding = linePadding,
                     translations = translation.lines,
+                    layOutAll = arrived,
                     onDraggingChange = { dragging -> if (dragging) idle.hold(SCROLL_HOLD) else idle.release(SCROLL_HOLD) },
                 )
                 lyrics.plainText.isNotEmpty() -> BasicText(

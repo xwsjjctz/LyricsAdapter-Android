@@ -37,8 +37,27 @@ private const val MAX_STEP_SECONDS = 1f / 240
 internal class LyricsScroller(private val anchor: LyricsAnchor) {
     /** Item tops and heights, and the view height, from the latest measure pass. */
     var tops: IntArray = IntArray(0)
+        private set
     var heights: IntArray = IntArray(0)
+        private set
     var viewportHeight: Int = 0
+        private set
+
+    /**
+     * Takes a measure pass. With [keepInPlace] the items stay where they are
+     * on screen although those above the sung one changed height: lines that
+     * were stand-ins got their real height, which is no reason to move.
+     */
+    fun measured(tops: IntArray, heights: IntArray, viewportHeight: Int, keepInPlace: Boolean) {
+        val before = if (keepInPlace && shifts.size == tops.size) targetShift(lastActive) else null
+        this.tops = tops
+        this.heights = heights
+        this.viewportHeight = viewportHeight
+        val moved = before?.let { targetShift(lastActive) - it } ?: return
+        if (moved == 0f) return
+        for (index in shifts.indices) shifts[index] += moved
+        frame++
+    }
 
     private var shifts = FloatArray(0)
     private var velocities = FloatArray(0)

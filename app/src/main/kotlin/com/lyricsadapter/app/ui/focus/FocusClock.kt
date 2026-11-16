@@ -44,7 +44,8 @@ internal class FocusClock {
  */
 @Composable
 internal fun rememberFocusClock(player: PlayerConnection, isPlaying: Boolean, trackId: String): FocusClock {
-    val clock = remember { FocusClock() }
+    // Starts where the player is, so the first frame already shows the lines being sung.
+    val clock = remember { FocusClock().apply { positionMs = player.positionMs() } }
     val playing by rememberUpdatedState(isPlaying)
     LaunchedEffect(trackId) {
         var position = player.positionMs().toDouble()

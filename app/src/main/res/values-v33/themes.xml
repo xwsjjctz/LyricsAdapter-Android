@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- As values-v31, and the logo also shows when something other than the launcher starts the app. -->
+    <style name="Theme.LyricsAdapter.Launch">
+        <item name="android:windowBackground">@drawable/startup_window</item>
+        <item name="android:windowSplashScreenBackground">@color/startup_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/startup_icon</item>
+        <item name="android:windowSplashScreenBehavior">icon_preferred</item>
+    </style>
+</resources>

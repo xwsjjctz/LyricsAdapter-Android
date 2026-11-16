@@ -24,6 +24,11 @@
     <string name="cloud_refresh">Actualiser la bibliothèque cloud</string>
     <string name="retry">Réessayer</string>
     <string name="import_files">Importer</string>
+    <string name="import_folder">Importer un dossier</string>
+    <string name="rescan_folders">Réanalyser les dossiers</string>
+    <string name="import_progress">Importation %1$d / %2$d…</string>
+    <string name="import_nothing_new">Aucun nouveau titre</string>
+    <string name="import_folder_failed">Impossible de lire ce dossier</string>
     <plurals name="import_done">
         <item quantity="one">%d titre importé</item>
         <item quantity="many">%d titres importés</item>
@@ -118,6 +123,10 @@
     <string name="cloud_not_connected">Non connecté</string>
     <string name="settings_language">Langue</string>
     <string name="settings_appearance">Apparence</string>
+    <string name="settings_folders">Dossiers locaux</string>
+    <string name="settings_folders_footer">Les titres ajoutés à un dossier sont importés à l\'ouverture de l\'app. Retirer un dossier retire ses titres de la bibliothèque ; les fichiers audio sont conservés.</string>
+    <string name="settings_folders_empty">Aucun dossier importé</string>
+    <string name="folder_remove_title">Retirer ce dossier ?</string>
     <string name="appearance_system">Comme le système</string>
     <string name="focus_background">Arrière-plan</string>
     <string name="focus_flowing_background">Arrière-plan fluide</string>

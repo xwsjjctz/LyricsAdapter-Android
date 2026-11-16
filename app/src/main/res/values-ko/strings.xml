@@ -22,6 +22,11 @@
     <string name="cloud_refresh">클라우드 라이브러리 새로고침</string>
     <string name="retry">다시 시도</string>
     <string name="import_files">파일 가져오기</string>
+    <string name="import_folder">폴더 가져오기</string>
+    <string name="rescan_folders">폴더 다시 검색</string>
+    <string name="import_progress">가져오는 중 %1$d / %2$d…</string>
+    <string name="import_nothing_new">새로운 곡이 없습니다</string>
+    <string name="import_folder_failed">이 폴더를 읽을 수 없습니다</string>
     <plurals name="import_done">
         <item quantity="other">%d곡을 가져왔습니다</item>
     </plurals>
@@ -108,6 +113,10 @@
     <string name="cloud_not_connected">연결 안 됨</string>
     <string name="settings_language">언어</string>
     <string name="settings_appearance">모양</string>
+    <string name="settings_folders">로컬 폴더</string>
+    <string name="settings_folders_footer">폴더에 추가된 곡은 앱을 열 때 자동으로 가져옵니다. 폴더를 제거하면 그 안의 곡이 보관함에서 빠지며, 오디오 파일은 그대로 남습니다.</string>
+    <string name="settings_folders_empty">아직 가져온 폴더가 없습니다</string>
+    <string name="folder_remove_title">이 폴더를 제거할까요?</string>
     <string name="appearance_system">시스템 설정 따르기</string>
     <string name="focus_background">배경</string>
     <string name="focus_flowing_background">흐르는 배경</string>

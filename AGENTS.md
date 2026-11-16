@@ -27,7 +27,9 @@ Change them only when the owner asks.
   `PluginLogger`. Do not add Kotlin Multiplatform targets until iOS work starts.
 - Releases are APKs on GitHub only; no Google Play.
 - Local music comes only from user imports through the Storage Access Framework
-  with persisted URI permissions. No MediaStore scanning, no media permissions.
+  with persisted URI permissions: files picked singly, or a folder (a document
+  tree), which the library then follows (`FolderScanner`, `FolderSync`). No
+  MediaStore scanning, no media permissions.
   The one exception is downloaded online songs: the app inserts them into
   MediaStore (`Music/LyricsAdapter`) itself, which needs no permission, and
   imports the returned URI.
@@ -43,7 +45,7 @@ Change them only when the owner asks.
 | `plugin-host-spike/` | JVM command line against the live services (`smoke`, `qq-login`) |
 | `audio-tags/` | Tag reading and writing: a Rust crate on lofty (`rust/`) with UniFFI Kotlin bindings (`src/main/kotlin`, generated and committed); `fixtures/` tags sample files with the desktop's libraries and records what desktop reads |
 | `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns; `LineMotion` ports AMLL's word float, held-word emphasis and fill sweep, which desktop's focus mode runs, pinned in `LineMotionTest` against values measured on desktop over CDP |
-| `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output) and download file names |
+| `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output), download file names, and what following a folder adds and removes (`FolderSync`) |
 | `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
 | `app/` | The Android app: SAF import into Room, Media3 playback service, the playlist page (search pinned over the list) and settings under iOS 26 Apple Music style Liquid Glass controls (`ui/glass/` on Kyant0's Backdrop library: the mini player over a draggable tab bar, menus drawn in the page, one edge look for all glass in `GlassSurface.kt`, the header's scroll edge), last playback restored on start, online downloads and focus mode |
 | `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
@@ -65,11 +67,24 @@ node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cas
 ./gradlew :app:assembleRelease                   # signed when keystore.properties exists at the root (never committed)
 python3 tools/i18n/generate.py                   # after changing values/strings.xml
 python3 tools/icons/generate.py ../LyricsAdapter # after adding an icon; needs fonttools and brotli
+python3 tools/startup/generate.py ../LyricsAdapter # the startup screen's artwork from desktop's; needs Pillow
 ./gradlew :spike-android:connectedDebugAndroidTest
 ```
 
 Plugins are read from the desktop's install directory `~/.la/plugin/<id>/`.
 Building the Android app needs the NDK, the Rust Android targets and cargo-ndk.
+
+## Startup screen
+
+Desktop's startup screen (`index.html`, `src/styles/startup.css`,
+`src/services/startupScreen.ts`) in three steps that show the same picture:
+the system's launch window (`Theme.LyricsAdapter.Launch`, the activity's theme
+in the manifest only), `StartupScreen` over the app from its first frame, and
+its lift once `AppScreen` reports the library read and the last playback
+restored. `MainActivity` switches to `Theme.LyricsAdapter` before it is
+created, so recreating the activity never shows the launch picture. What
+shows under the screen at its lift must be settled: restore without
+animation, and wait for what arrives late (the player reporting its track).
 
 ## Plugins in the app
 
@@ -122,6 +137,13 @@ Vorbis field. Word lyrics follow desktop's `wordLyricsTagService.ts`.
   `derivedStateOf`, so a frame redraws without recomposing; the spike's
   `LyricsView` keeps the UI thread under 3 ms per frame this way.
 - Blur and the AGSL background must stay switchable for slower devices.
+- Laying out a song's lines costs a text layout and a layer each. `LyricsView`
+  lays out the lines around the sung one at once and the rest a few per frame
+  (`LINES_PER_FRAME`), after focus mode has slid in; `balancedLines` measures a
+  line once and reads word widths from it; `SungLinePainter` works out a
+  line's word timing when it is first sung. Keep opening focus mode to a
+  frame or two: check with `dumpsys gfxinfo <package> framestats` on the
+  profile build (about 35 ms for the first frame on the test phone).
 - Text drawn under a plain translation lands on whole pixels, so slow
   motion of a few pixels (a word floating up, a line settling) moves in
   visible one-pixel steps. Move such text as an offscreen layer instead, as

@@ -221,6 +221,39 @@ STRINGS = {
         "Der fließende Hintergrund braucht Android 13 oder neuer.", "Le fond animé nécessite Android 13 ou une version ultérieure.",
     ],
     "track_download": ["Download", "ダウンロード", "다운로드", "Herunterladen", "Télécharger"],
+    "import_folder": ["Import Folder", "フォルダを読み込む", "폴더 가져오기", "Ordner importieren", "Importer un dossier"],
+    "rescan_folders": ["Rescan Folders", "フォルダを再スキャン", "폴더 다시 검색", "Ordner erneut durchsuchen", "Réanalyser les dossiers"],
+    "import_progress": [
+        "Importing %1$d / %2$d…",
+        "読み込み中 %1$d / %2$d…",
+        "가져오는 중 %1$d / %2$d…",
+        "Importiere %1$d / %2$d …",
+        "Importation %1$d / %2$d…",
+    ],
+    "import_nothing_new": ["No new songs", "新しい曲はありません", "새로운 곡이 없습니다", "Keine neuen Titel", "Aucun nouveau titre"],
+    "import_folder_failed": [
+        "This folder can't be read",
+        "このフォルダを読み込めません",
+        "이 폴더를 읽을 수 없습니다",
+        "Dieser Ordner kann nicht gelesen werden",
+        "Impossible de lire ce dossier",
+    ],
+    "settings_folders": ["Local Folders", "ローカルフォルダ", "로컬 폴더", "Lokale Ordner", "Dossiers locaux"],
+    "settings_folders_footer": [
+        "Songs added to a folder are imported when the app opens. Removing a folder takes its songs out of the library; the audio files are kept.",
+        "フォルダに追加された曲は、アプリを開いたときに自動で読み込まれます。フォルダを削除するとその曲はライブラリから外れますが、音声ファイルは残ります。",
+        "폴더에 추가된 곡은 앱을 열 때 자동으로 가져옵니다. 폴더를 제거하면 그 안의 곡이 보관함에서 빠지며, 오디오 파일은 그대로 남습니다.",
+        "Neue Titel in einem Ordner werden beim Öffnen der App importiert. Wird ein Ordner entfernt, verschwinden seine Titel aus der Mediathek; die Audiodateien bleiben erhalten.",
+        "Les titres ajoutés à un dossier sont importés à l'ouverture de l'app. Retirer un dossier retire ses titres de la bibliothèque ; les fichiers audio sont conservés.",
+    ],
+    "settings_folders_empty": [
+        "No folders imported yet",
+        "まだフォルダを読み込んでいません",
+        "아직 가져온 폴더가 없습니다",
+        "Noch keine Ordner importiert",
+        "Aucun dossier importé",
+    ],
+    "folder_remove_title": ["Remove this folder?", "このフォルダを削除しますか？", "이 폴더를 제거할까요?", "Diesen Ordner entfernen?", "Retirer ce dossier ?"],
 }
 
 PLURALS = {

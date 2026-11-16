@@ -27,6 +27,11 @@
 
     <!-- Library actions -->
     <string name="import_files">导入文件</string>
+    <string name="import_folder">导入文件夹</string>
+    <string name="rescan_folders">重新扫描文件夹</string>
+    <string name="import_progress">正在导入 %1$d / %2$d…</string>
+    <string name="import_nothing_new">没有新的歌曲</string>
+    <string name="import_folder_failed">无法读取这个文件夹</string>
     <plurals name="import_done">
         <item quantity="other">已导入 %d 首</item>
     </plurals>
@@ -122,6 +127,10 @@
     <string name="cloud_not_connected">未连接</string>
     <string name="settings_language">语言</string>
     <string name="settings_appearance">外观</string>
+    <string name="settings_folders">本地文件夹</string>
+    <string name="settings_folders_footer">文件夹里新增的歌曲会在打开应用时自动导入。移除文件夹会把其中的歌曲移出曲库，音频文件会保留。</string>
+    <string name="settings_folders_empty">还没有导入文件夹</string>
+    <string name="folder_remove_title">移除这个文件夹？</string>
     <string name="appearance_system">跟随系统</string>
     <string name="focus_background">背景</string>
     <string name="focus_flowing_background">动态流光背景</string>

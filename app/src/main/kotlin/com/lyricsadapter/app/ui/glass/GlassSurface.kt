@@ -44,7 +44,7 @@ internal class GlassLook(
 )
 
 private val DarkGlass = GlassLook(
-    tint = Color(0xFF1C1C1E).copy(alpha = 0.65f),
+    tint = Color(0xFF1C1C1E).copy(alpha = 0.5f),
     highlight = Highlight(
         width = 1.dp,
         blurRadius = 0.75.dp,
@@ -55,7 +55,7 @@ private val DarkGlass = GlassLook(
 )
 
 private val LightGlass = GlassLook(
-    tint = Color(0xFFF9F9F9).copy(alpha = 0.7f),
+    tint = Color(0xFFF9F9F9).copy(alpha = 0.56f),
     highlight = Highlight(
         width = 1.dp,
         blurRadius = 0.75.dp,
@@ -65,7 +65,7 @@ private val LightGlass = GlassLook(
     shadow = Shadow(radius = 20.dp, offset = DpOffset(0.dp, 6.dp), color = Color.Black.copy(alpha = 0.14f)),
 )
 
-/** Light glass on light pages, dark glass on dark ones; dense enough that the list under a bar does not read through it. */
+/** Light glass on light pages, dark glass on dark ones; the tint is how see-through it is, thinned at the owner's request (2026-11-14). */
 @Composable
 internal fun glassLook(): GlassLook = if (LocalAppColors.current.isDark) DarkGlass else LightGlass
 
