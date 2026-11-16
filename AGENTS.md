@@ -50,7 +50,7 @@ Change them only when the owner asks.
 | `app/` | The Android app: SAF import into Room, Media3 playback service, the playlist page (search pinned over the list) and settings under iOS 26 Apple Music style Liquid Glass controls (`ui/glass/` on Kyant0's Backdrop library: the mini player over a draggable tab bar, menus drawn in the page, one edge look for all glass in `GlassSurface.kt`, the header's scroll edge), last playback restored on start, online downloads and focus mode |
 | `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
 | `tools/icons/` | `generate.py` writes the `ui_*`/`ms_*` drawables from desktop's Material Symbols Rounded font (`node_modules/material-symbols`) at the axes desktop's CSS uses: FILL 0 opsz 24 by default, FILL 1 opsz 48 in focus mode |
-| `tools/ci/` | `check_page_size.py <apk>` fails unless every native library in the APK loads on 16 KB page devices; both workflows run it |
+| `tools/ci/` | `verify_apk.sh <apk>`, which both workflows run on what they build: the APK must be signed, carry the version in `gradle.properties` and pass `check_page_size.py` (every native library loads on 16 KB page devices) |
 | `spike-android/` | Android app whose instrumented tests run the plugin host and the tag library on a device; also the lyrics rendering prototype |
 | `buildSrc/` | `BuildRustLibraries`, the cargo-ndk task both Android apps use to build `libaudio_tags.so` |
 
