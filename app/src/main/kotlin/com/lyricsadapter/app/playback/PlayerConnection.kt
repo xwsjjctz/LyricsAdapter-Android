@@ -104,7 +104,7 @@ class PlayerConnection(private val context: Context) {
         controller?.seekToNextMediaItem()
     }
 
-    /** Back to the start of the track, or to the previous one when near the start, like a CD player. */
+    /** To the previous track however far this one has played; the service's player is set up for that (`PlaybackService`). */
     fun previous() {
         controller?.seekToPrevious()
     }
