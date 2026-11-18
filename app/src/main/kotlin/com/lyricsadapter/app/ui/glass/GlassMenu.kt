@@ -1,10 +1,10 @@
 package com.lyricsadapter.app.ui.glass
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -48,6 +48,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -196,6 +197,9 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
             state.itemBounds.clear()
         }
     }
+    // Back closes the menu before anything else. Added when the menu opens, so it is the newest
+    // handler and comes before the page's own (search, selection, leaving settings), whenever those were added.
+    if (request != null) BackHandler { request.onDismiss() }
     val menu = shown ?: return
     // The progress is read only while drawing, so the springs redraw the menu without recomposing it.
     val progress = state.progress
@@ -204,7 +208,20 @@ internal fun BoxScope.GlassMenuHost(state: GlassMenuState, backdrop: Backdrop) {
         Modifier
             .matchParentSize()
             .drawBehind { drawRect(MenuVeil, alpha = progress.value.coerceIn(0f, 1f)) }
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.request?.onDismiss?.invoke() },
+            // Any touch outside the panel closes the menu, a swipe as much as a tap, and goes no further:
+            // nothing under an open menu acts before the menu is gone.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown().consume()
+                    state.request?.onDismiss?.invoke()
+                }
+            }
+            .semantics {
+                onClick {
+                    state.request?.onDismiss?.invoke()
+                    true
+                }
+            },
     )
     menu.preview?.let { preview ->
         Box(

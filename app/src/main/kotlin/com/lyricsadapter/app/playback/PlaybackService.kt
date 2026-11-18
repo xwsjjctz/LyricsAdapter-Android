@@ -64,6 +64,10 @@ class PlaybackService : MediaSessionService() {
                 /* handleAudioFocus = */ true,
             )
             .setHandleAudioBecomingNoisy(true)
+            // "Previous" always goes to the previous track, as desktop's skipBackward does
+            // (`src/hooks/usePlayback.ts`), from the app's controls, the notification and a headset alike.
+            // Media3 would otherwise restart the current track once it has played for three seconds.
+            .setMaxSeekToPreviousPositionMs(Long.MAX_VALUE)
             .build()
         val openApp = PendingIntent.getActivity(
             this,
