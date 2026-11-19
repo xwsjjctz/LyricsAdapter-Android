@@ -4,6 +4,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- The app updates itself from its GitHub releases (update/AppUpdater.kt): installing the APK it downloaded,
+         without a confirmation where the system allows an app to update itself, and not downloading over a metered network unasked. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Cleartext is allowed: self-hosted WebDAV servers on a home network and the music sources' audio CDNs are often plain HTTP. -->
     <application
         android:name=".LyricsAdapterApplication"
@@ -33,6 +39,11 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!-- Hears from the system how installing an update went. -->
+        <receiver
+            android:name=".update.UpdateInstallReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

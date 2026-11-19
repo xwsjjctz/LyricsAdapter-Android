@@ -12,6 +12,7 @@
 - 云端曲库：WebDAV，读取桌面写的 Metadata v3，清单外的歌曲从文件头读标签
 - 插件：官方目录下载或本地安装，扫码 / Cookie 登录，在线搜索、播放、歌词与歌单；插件平台（`activate(context)`）的音乐源与歌词翻译插件：设置页按清单显示配置项，专注模式里一键显示对照译文
 - 设置：通用（语言、外观）、专注模式、云端曲库、插件、关于
+- 应用更新：与桌面版一样从 GitHub Release 更新自己。启动几秒后和在「设置 › 关于」里手动检查；发现新版本后直接下载（按流量计费的网络下等你点「下载更新」），校验大小、SHA-256、包名和版本；下载好后可以点「安装更新」，或者在没有播放时把应用退到后台，它会自己装好，下次打开就是新版。第一次需要在系统里允许本应用「安装未知应用」，之后 Android 12 及以上可以不再弹确认（在 Android 14 和 16 的模拟器上实测如此，各家 ROM 可能仍会询问）；系统坚持要确认时，回到应用会提示到设置里安装。更新是覆盖安装，曲库、插件和登录状态都保留
 - 语言：中文、English、日本語、한국어、Deutsch、Français（与桌面相同；Android 13 起可在应用内单独设置）
 
 ## 结构
@@ -24,6 +25,7 @@
 | `audio-tags/` | 标签读写：Rust crate（`rust/`，lofty 0.25，与桌面的 music-tag-native 同一版本线）经 UniFFI 生成 Kotlin 绑定（`src/main/kotlin`，已生成，改 Rust 后运行 `generateBindings`）。`fixtures/` 用桌面同款库生成带标签的样本和桌面读到的期望值 |
 | `lyrics/` | 纯 Kotlin 的 LRC/QRC/YRC 解析与歌词行模型；`fixtures/` 记录桌面 `lrcParser.ts` 对同一批输入的解析结果，测试逐项对照 |
 | `library/` | 纯 Kotlin 的曲库模型：`Track`、海报墙布局（`wall/`，窄屏模板与宽屏分带，测试与桌面 TypeScript 的输出逐格比对）、下载文件命名、文件夹同步的增删判断（`FolderSync`） |
+| `update/` | 纯 Kotlin 的应用更新逻辑：版本号的解析与比较（`AppVersion`）、读 GitHub 的发布列表并选出要更新到的版本（`ReleaseFeed`） |
 | `app/` | 安卓应用：系统文件选择器导入（持久化授权）、标签存入 Room、Media3 后台播放（通知栏、锁屏、耳机拔出暂停）、Apple Music 风格的曲库列表、液态玻璃标签栏、控制栏与菜单、专注模式歌词（点歌词跳转） |
 | `buildSrc/` | 两个安卓工程共用的 cargo-ndk 构建任务 |
 | `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查；构建时用 cargo-ndk 编出 `libaudio_tags.so`。桌面图标打开的是歌词渲染原型（`src/main/kotlin/.../lyrics/`），演示歌词由 `tools/demo-lyrics.mjs` 交给桌面仓库的 `lrcParser.ts` 解析生成，歌词文字是原创的 |
@@ -41,6 +43,7 @@
 ./gradlew :audio-tags:generateBindings                  # 改了 Rust 接口后重新生成 Kotlin 绑定
 (cd audio-tags/fixtures && npm install && npm run generate)  # 重新生成样本与期望值，需要 ffmpeg 和 metaflac
 ./gradlew :lyrics:test :library:test                   # 歌词解析与桌面对照、曲库模型
+./gradlew :update:test                                  # 版本比较与发布列表解析
 ./gradlew :app:installDebug                             # 应用的 debug 构建，包名 com.lyricsadapter.app.debug
 ./gradlew :app:installProfile                           # 正式版代码（R8）、debug 包名和签名，覆盖安装后测性能
 ./gradlew :app:assembleRelease                          # 正式版；没有 keystore.properties 时不签名

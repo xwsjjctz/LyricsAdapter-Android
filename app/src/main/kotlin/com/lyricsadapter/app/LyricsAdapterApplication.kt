@@ -19,6 +19,7 @@ import com.lyricsadapter.app.plugins.OnlineLibrary
 import com.lyricsadapter.app.plugins.PluginCatalog
 import com.lyricsadapter.app.plugins.PluginRegistry
 import com.lyricsadapter.app.playback.SystemVolume
+import com.lyricsadapter.app.update.AppUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,6 +61,9 @@ class AppContainer(context: Context) {
     val online = OnlineLibrary(sources, File(context.filesDir, "online-library.json"), scope)
     val downloads = OnlineDownloads(context.contentResolver, sources, library, File(context.cacheDir, "downloads"), scope)
     val player = PlayerConnection(context)
+
+    /** Newer versions of the app itself, from its releases. */
+    val updater = AppUpdater(context, BuildConfig.UPDATE_FEED_URL, scope)
 
     /** Whether this process has shown its startup screen: once per launch, not again when the activity is recreated. */
     var startupShown = false

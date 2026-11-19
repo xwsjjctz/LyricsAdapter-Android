@@ -2,6 +2,7 @@ package com.lyricsadapter.app
 
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) splashScreen.setOnExitAnimationListener { it.remove() }
         val container = container
         lifecycleScope.launch { container.player.connect() }
+        container.updater.checkAtStartup()
         setContent {
             val colorMode by container.settings.colorMode.value.collectAsStateWithLifecycle()
             LyricsAdapterTheme(colorMode) {
@@ -45,5 +47,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // A downloaded update that could not be installed while the app was away waits in settings.
+        container.updater.takeNotice()?.let { version ->
+            Toast.makeText(this, getString(R.string.update_ready_notice, version), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Put away, not turned around: the moment a downloaded update can go in without interrupting.
+        if (!isChangingConfigurations) container.updater.onBackground(playing = container.player.state.value.isPlaying)
     }
 }

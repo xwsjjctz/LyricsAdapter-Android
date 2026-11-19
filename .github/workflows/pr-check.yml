@@ -32,7 +32,7 @@ jobs:
 
       # audio-tags 的测试会先用 cargo 为本机编译 Rust 库。
       - name: Unit tests
-        run: ./gradlew :plugin-host:test :audio-tags:test :lyrics:test :library:test :webdav:test
+        run: ./gradlew :plugin-host:test :audio-tags:test :lyrics:test :library:test :webdav:test :update:test
 
       - name: Upload test reports
         if: failure()

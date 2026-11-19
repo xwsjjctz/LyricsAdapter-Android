@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lyricsadapter.app.AppContainer
 import com.lyricsadapter.app.R
+import com.lyricsadapter.app.update.AppUpdater
+import com.lyricsadapter.app.update.UpdateState
 import com.lyricsadapter.app.data.AppLanguage
 import com.lyricsadapter.app.ui.focus.flowingBackgroundSupported
 import com.lyricsadapter.app.data.AppSettings
@@ -134,7 +136,7 @@ fun SettingsScreen(container: AppContainer, initialPage: SettingsPage, onClose: 
                 SettingsPage.Focus -> FocusPage(settings)
                 SettingsPage.Cloud -> CloudPage(settings)
                 SettingsPage.Plugins -> PluginsPage(container, onOpenPlugin = { location = location.copy(plugin = it) })
-                SettingsPage.About -> AboutPage()
+                SettingsPage.About -> AboutPage(container.updater)
                 }
             }
             Spacer(Modifier.height(24.dp + bottomPadding))
@@ -329,7 +331,7 @@ private fun CloudPage(settings: AppSettings) {
 private class CloudTexts(val fillAll: String, val connected: String, val invalidUrl: String)
 
 @Composable
-private fun AboutPage() {
+private fun AboutPage(updater: AppUpdater) {
     val context = LocalContext.current
     val colors = LocalAppColors.current
     val version = remember(context) { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
@@ -337,6 +339,7 @@ private fun AboutPage() {
         BasicText(stringResource(R.string.app_name), style = TextStyle(color = colors.text, fontSize = 22.sp, fontWeight = FontWeight.Bold))
         BasicText(stringResource(R.string.about_version, version), style = TextStyle(color = colors.secondaryText, fontSize = 14.sp))
     }
+    UpdateGroup(updater)
     SettingsGroup {
         SettingsRow(stringResource(R.string.about_desktop), onClick = {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/xwsjjctz/LyricsAdapter")))
@@ -348,6 +351,35 @@ private fun AboutPage() {
             SettingsRow(name, detail = license, chevron = false)
         }
     }
+}
+
+/**
+ * The app's own updates, as desktop's settings show them: where updating
+ * stands, and the one thing to do next. Absent in builds that do not update.
+ */
+@Composable
+private fun UpdateGroup(updater: AppUpdater) {
+    val state by updater.state.collectAsStateWithLifecycle()
+    if (state == UpdateState.Unavailable) return
+    val check = stringResource(R.string.updater_check)
+    // What the row does, what it says about the state, and what a tap runs; no action while something is under way.
+    val (title, detail, action) = when (val current = state) {
+        UpdateState.Unavailable, UpdateState.Idle -> Triple(check, null, updater::check)
+        UpdateState.Checking -> Triple(check, stringResource(R.string.updater_checking), null)
+        UpdateState.UpToDate -> Triple(check, stringResource(R.string.updater_up_to_date), updater::check)
+        is UpdateState.Available ->
+            Triple(stringResource(R.string.updater_download), "${stringResource(R.string.updater_available)} v${current.release.version}", updater::download)
+        is UpdateState.Downloading ->
+            Triple(check, "${stringResource(R.string.updater_downloading)} v${current.release.version} ${(current.fraction * 100).toInt()}%", null)
+        is UpdateState.Downloaded ->
+            Triple(stringResource(R.string.updater_install), "${stringResource(R.string.updater_downloaded)} v${current.release.version}", updater::install)
+        is UpdateState.Installing -> Triple(stringResource(R.string.updater_install), stringResource(R.string.updater_installing), null)
+        is UpdateState.Failed -> Triple(check, stringResource(R.string.updater_failed), updater::check)
+    }
+    SettingsGroup {
+        SettingsRow(title, detail = detail, chevron = false, onClick = action)
+    }
+    (state as? UpdateState.Failed)?.let { StatusText(it.message, error = true) }
 }
 
 /** Third-party parts shipped in the app and the licences they come under. */

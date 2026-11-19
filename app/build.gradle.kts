@@ -25,6 +25,15 @@ val appVersionName: String = providers.gradleProperty("appVersionName").get()
 val appVersionCode: Int = appVersionName.substringBefore('-').split('.').map(String::toInt)
     .let { (major, minor, patch) -> major * 1_000_000 + minor * 1_000 + patch }
 
+/**
+ * Where the app looks for newer versions of itself: a GitHub "list releases"
+ * address. Release builds read this repository's unless `-PupdateFeedUrl=…`
+ * names another (a fork's, or a test feed); other builds have none and do not
+ * update, as a release's APK is another package to them.
+ */
+val updateFeedUrl: String? = providers.gradleProperty("updateFeedUrl").orNull
+val releaseFeedUrl = "https://api.github.com/repos/xwsjjctz/LyricsAdapter-Android/releases?per_page=30"
+
 /** ABIs the app ships; the Rust library is built for each, other libraries' extra ABIs are dropped. */
 val appAbis = listOf("arm64-v8a", "x86_64")
 
@@ -48,6 +57,7 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+        buildConfigField("String", "UPDATE_FEED_URL", "\"${updateFeedUrl.orEmpty()}\"")
         ndk {
             abiFilters.addAll(appAbis)
         }
@@ -60,6 +70,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     signingConfigs {
@@ -83,12 +94,14 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
+            buildConfigField("String", "UPDATE_FEED_URL", "\"${updateFeedUrl ?: releaseFeedUrl}\"")
         }
         // Release code under the debug id and key: installs over a development build, keeping its library, to measure speed.
         create("profile") {
             initWith(getByName("release"))
             applicationIdSuffix = ".debug"
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "UPDATE_FEED_URL", "\"${updateFeedUrl.orEmpty()}\"")
             matchingFallbacks += "release"
         }
     }
@@ -104,6 +117,7 @@ dependencies {
     implementation(project(":library"))
     implementation(project(":webdav"))
     implementation(project(":plugin-host"))
+    implementation(project(":update"))
     implementation(libs.jna) {
         artifact { type = "aar" }
     }
