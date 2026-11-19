@@ -47,7 +47,8 @@ Change them only when the owner asks.
 | `lyrics/` | Pure Kotlin LRC/QRC/YRC parser and line model; `fixtures/` records what desktop's `lrcParser.ts` returns; `LineMotion` ports AMLL's word float, held-word emphasis and fill sweep, which desktop's focus mode runs, pinned in `LineMotionTest` against values measured on desktop over CDP |
 | `library/` | Pure Kotlin library model: `Track`, the poster wall layout (`wall/`: desktop's narrow templates and its wide band packer, tested cell by cell against desktop's TypeScript output), download file names, and what following a folder adds and removes (`FolderSync`) |
 | `webdav/` | Pure Kotlin WebDAV client on OkHttp: connection test, PROPFIND listing, text files, byte ranges; paths follow desktop's `webdavPath.ts`; reads desktop's Metadata v3 (`_manifest.json` + `_chunk_*.json`) |
-| `app/` | The Android app: SAF import into Room, Media3 playback service, the playlist page (search pinned over the list) and settings under iOS 26 Apple Music style Liquid Glass controls (`ui/glass/` on Kyant0's Backdrop library: the mini player over a draggable tab bar, menus drawn in the page, one edge look for all glass in `GlassSurface.kt`, the header's scroll edge), last playback restored on start, online downloads and focus mode |
+| `update/` | Pure Kotlin logic of the app's own updates: `AppVersion` (parsing, ordering, desktop's rule for who follows pre-releases) and `ReleaseFeed` (GitHub's release list read into installable releases, the one to update to, which download addresses are trusted) |
+| `app/` | The Android app: SAF import into Room, Media3 playback service, the playlist page (search pinned over the list) and settings under iOS 26 Apple Music style Liquid Glass controls (`ui/glass/` on Kyant0's Backdrop library: the mini player over a draggable tab bar, menus drawn in the page, one edge look for all glass in `GlassSurface.kt`, the header's scroll edge, whose veil thickens to the page's colour at the top), last playback restored on start, online downloads and focus mode |
 | `tools/i18n/` | `generate.py` writes `values-en/ja/ko/de/fr` from `values/strings.xml`: strings whose Chinese matches desktop's `zh.json` take desktop's translations, the rest come from `manual.py` |
 | `tools/icons/` | `generate.py` writes the `ui_*`/`ms_*` drawables from desktop's Material Symbols Rounded font (`node_modules/material-symbols`) at the axes desktop's CSS uses: FILL 0 opsz 24 by default, FILL 1 opsz 48 in focus mode |
 | `tools/ci/` | `verify_apk.sh <apk>`, which both workflows run on what they build: the APK must be signed, carry the version in `gradle.properties` and pass `check_page_size.py` (every native library loads on 16 KB page devices) |
@@ -61,7 +62,7 @@ Change them only when the owner asks.
 ./gradlew :audio-tags:test                       # builds the host library with cargo first
 ./gradlew :audio-tags:generateBindings           # after changing the Rust API
 (cd audio-tags/fixtures && npm install && npm run generate)   # needs ffmpeg and metaflac
-./gradlew :lyrics:test :library:test :webdav:test
+./gradlew :lyrics:test :library:test :webdav:test :update:test
 node lyrics/fixtures/generate.mjs ../LyricsAdapter   # after changing parser cases; argument is the desktop checkout
 ./gradlew :app:installDebug                      # installs as com.lyricsadapter.app.debug
 ./gradlew :app:installProfile                    # release code (R8) under the debug id and key, for measuring speed
@@ -184,6 +185,39 @@ pre-release. It needs the `ANDROID_KEYSTORE_BASE64`,
 secrets and fails without them. Release builds use R8: keep rules for reflection-based code (JNA and
 the UniFFI bindings) live in `app/proguard-rules.pro`, and resources must be
 loaded by absolute path, because R8 moves classes between packages.
+
+## The app's own updates
+
+`app/.../update/AppUpdater.kt` follows desktop's `electron/updater.ts`: a
+check five seconds after launch and from Settings › About, the newer version
+downloaded at once (on a metered network only when asked), then installed
+through `PackageInstaller` when the user asks, or by itself when the app is
+put away with nothing playing. Android has no equivalent of desktop's
+incremental download; the whole APK is fetched.
+
+- The feed is GitHub's release list, not `releases/latest`, which leaves
+  pre-releases out, and every `v0.*` is one. An app under 1.0 or with a
+  suffixed version takes pre-releases, as on desktop. A release counts once
+  it carries an asset ending in `.apk`; GitHub's `digest` of it is checked.
+- `BuildConfig.UPDATE_FEED_URL` is the feed: this repository's in release
+  builds, none in debug and profile builds (a release APK is another package
+  to them, so the row in About is hidden). `-PupdateFeedUrl=…` sets it for
+  any build: a fork's repository, or a test feed. To try the whole flow on
+  an emulator, build two profile APKs with different `-PappVersionName` and
+  the same `-PupdateFeedUrl=http://10.0.2.2:<port>/releases.json`, and serve
+  a release list naming the newer one from the host.
+- The system only installs an APK signed with the installed app's key. The
+  first update needs the user to allow "install unknown apps" for the app;
+  after that Android 12 and later may install without asking
+  (`USER_ACTION_NOT_REQUIRED`; seen on API 34 and 36 emulators, not yet tried
+  on a phone, whose ROM may still ask). Where
+  the system still asks during a quiet attempt, the session is abandoned and
+  the user is told once to install from settings.
+- Installing ends the app's process and nothing may bring it back to the
+  screen (background activity starts are blocked), so there is no "restart".
+- An update installs over the app: `files/` (library, plugins, logins) stays.
+  Only uninstalling, or installing a build under another package name or
+  key, starts empty.
 
 ## Testing on a device
 

@@ -2,7 +2,7 @@
 
 [LyricsAdapter](https://github.com/xwsjjctz/LyricsAdapter) 的安卓客户端。技术验证（QuickJS 跑插件、lofty 读写标签、Compose 逐字歌词）已完成，应用已覆盖桌面版的主要页面：
 
-- 界面结构仿 iOS 26 Apple Music：底部是常驻的玻璃胶囊控制栏（上一首、播放/暂停、下一首，上一首与桌面一样总是切到前一首；点开专注模式，左右滑动切歌；没有歌曲时显示应用图标与「轻点歌曲开始播放」），其下是液态玻璃标签栏（点按或拖动切换「播放列表」「设置」），横屏时控制栏居中、标签栏靠右；玻璃边缘是柔和的高光、内侧辉光与投影；顶栏没有底色，列表滚到标题与搜索框下方时逐渐模糊淡出；长按与下拉菜单是玻璃面板，长按的歌曲行浮起、页面模糊，按住滑到选项上松手即执行，按返回或触碰面板以外的任何地方先关闭菜单；重新打开会停在上次播放的歌曲与位置（歌单从音乐源重新获取）；玻璃效果用 [Backdrop](https://github.com/Kyant0/AndroidLiquidGlass)（Apache-2.0）
+- 界面结构仿 iOS 26 Apple Music：底部是常驻的玻璃胶囊控制栏（上一首、播放/暂停、下一首，上一首与桌面一样总是切到前一首；点开专注模式，左右滑动切歌；没有歌曲时显示应用图标与「轻点歌曲开始播放」），其下是液态玻璃标签栏（点按或拖动切换「播放列表」「设置」），横屏时控制栏居中、标签栏靠右；玻璃边缘是柔和的高光、内侧辉光与投影；顶栏没有底色，列表滚到标题与搜索框下方时逐渐模糊淡出，越往上越接近页面底色；长按与下拉菜单是玻璃面板，长按的歌曲行浮起、页面模糊，按住滑到选项上松手即执行，按返回或触碰面板以外的任何地方先关闭菜单；重新打开会停在上次播放的歌曲与位置（歌单从音乐源重新获取）；玻璃效果用 [Backdrop](https://github.com/Kyant0/AndroidLiquidGlass)（Apache-2.0）
 - 启动画面：与桌面版相同，logo 居中、背景是 logo 模糊后的色彩；从系统启动窗无缝接上，曲库读完、上次播放恢复好之后 logo 放大淡出，看不到加载过程
 - 曲库：本地、云端、在线播放记录三个槽位，标题下拉里还列出各音乐源账号的歌单（可管理显示哪些），点标题立即展开，双击标题栏的空白处回到顶部；标题下方固定一条玻璃搜索框，列表从它下面滚过，输入时原地显示搜索结果；海报墙（窄屏用桌面的 6 列模板，宽于 720dp 用桌面的分带排列）与 Apple Music 风格列表可切换；「更多」菜单里有播放全部、随机播放、定位当前、导入文件、导入文件夹（含子文件夹；之后每次打开应用或手动重新扫描时，文件夹里新增的歌曲自动导入、已删除的移出，在「设置 › 通用」里移除文件夹）、刷新云端、多选与切换布局；长按菜单、多选移除
 - 搜索：本地、云端、各音乐源与歌单的统一搜索（支持拼音），在曲库标题下方的搜索框里
@@ -12,6 +12,7 @@
 - 云端曲库：WebDAV，读取桌面写的 Metadata v3，清单外的歌曲从文件头读标签
 - 插件：官方目录下载或本地安装，扫码 / Cookie 登录，在线搜索、播放、歌词与歌单；插件平台（`activate(context)`）的音乐源与歌词翻译插件：设置页按清单显示配置项，专注模式里一键显示对照译文
 - 设置：通用（语言、外观）、专注模式、云端曲库、插件、关于
+- 应用更新：与桌面版一样从 GitHub Release 更新自己。启动几秒后和在「设置 › 关于」里手动检查；发现新版本后直接下载（按流量计费的网络下等你点「下载更新」），校验大小、SHA-256、包名和版本；下载好后可以点「安装更新」，或者在没有播放时把应用退到后台，它会自己装好，下次打开就是新版。第一次需要在系统里允许本应用「安装未知应用」，之后 Android 12 及以上可以不再弹确认（在 Android 14 和 16 的模拟器上实测如此，各家 ROM 可能仍会询问）；系统坚持要确认时，回到应用会提示到设置里安装。更新是覆盖安装，曲库、插件和登录状态都保留
 - 语言：中文、English、日本語、한국어、Deutsch、Français（与桌面相同；Android 13 起可在应用内单独设置）
 
 ## 结构
@@ -24,6 +25,7 @@
 | `audio-tags/` | 标签读写：Rust crate（`rust/`，lofty 0.25，与桌面的 music-tag-native 同一版本线）经 UniFFI 生成 Kotlin 绑定（`src/main/kotlin`，已生成，改 Rust 后运行 `generateBindings`）。`fixtures/` 用桌面同款库生成带标签的样本和桌面读到的期望值 |
 | `lyrics/` | 纯 Kotlin 的 LRC/QRC/YRC 解析与歌词行模型；`fixtures/` 记录桌面 `lrcParser.ts` 对同一批输入的解析结果，测试逐项对照 |
 | `library/` | 纯 Kotlin 的曲库模型：`Track`、海报墙布局（`wall/`，窄屏模板与宽屏分带，测试与桌面 TypeScript 的输出逐格比对）、下载文件命名、文件夹同步的增删判断（`FolderSync`） |
+| `update/` | 纯 Kotlin 的应用更新逻辑：版本号的解析与比较（`AppVersion`）、读 GitHub 的发布列表并选出要更新到的版本（`ReleaseFeed`） |
 | `app/` | 安卓应用：系统文件选择器导入（持久化授权）、标签存入 Room、Media3 后台播放（通知栏、锁屏、耳机拔出暂停）、Apple Music 风格的曲库列表、液态玻璃标签栏、控制栏与菜单、专注模式歌词（点歌词跳转） |
 | `buildSrc/` | 两个安卓工程共用的 cargo-ndk 构建任务 |
 | `spike-android/` | 安卓工程，插桩测试在设备或模拟器上跑同样的检查；构建时用 cargo-ndk 编出 `libaudio_tags.so`。桌面图标打开的是歌词渲染原型（`src/main/kotlin/.../lyrics/`），演示歌词由 `tools/demo-lyrics.mjs` 交给桌面仓库的 `lrcParser.ts` 解析生成，歌词文字是原创的 |
@@ -41,6 +43,7 @@
 ./gradlew :audio-tags:generateBindings                  # 改了 Rust 接口后重新生成 Kotlin 绑定
 (cd audio-tags/fixtures && npm install && npm run generate)  # 重新生成样本与期望值，需要 ffmpeg 和 metaflac
 ./gradlew :lyrics:test :library:test                   # 歌词解析与桌面对照、曲库模型
+./gradlew :update:test                                  # 版本比较与发布列表解析
 ./gradlew :app:installDebug                             # 应用的 debug 构建，包名 com.lyricsadapter.app.debug
 ./gradlew :app:installProfile                           # 正式版代码（R8）、debug 包名和签名，覆盖安装后测性能
 ./gradlew :app:assembleRelease                          # 正式版；没有 keystore.properties 时不签名
